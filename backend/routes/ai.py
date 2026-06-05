@@ -258,7 +258,7 @@ User question: {req.message}
 
 Answer specifically and practically in 2-4 sentences. Use farm data when relevant. Be the smartest advisor in the room."""
     reply = await ai("chat", prompt)
-    return {"reply": reply, "model": "gemini-2.0-flash"}
+    return {"reply": reply, "model": "groq-llama-70b"}
 
 
 # ─── Sentiment Trend ────────────────────────────────────────────────────────────
