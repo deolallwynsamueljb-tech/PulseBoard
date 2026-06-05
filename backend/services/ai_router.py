@@ -21,7 +21,7 @@ GROQ_SMART    = "llama-3.3-70b-versatile"
 
 async def _call_openai_compat(url: str, api_key: str, model: str, prompt: str, max_tokens: int = 1400) -> str:
     """Shared OpenAI-compatible POST — used by both Groq and Mistral."""
-    async with httpx.AsyncClient(timeout=40) as client:
+    async with httpx.AsyncClient(timeout=9) as client:
         res = await client.post(
             url,
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
