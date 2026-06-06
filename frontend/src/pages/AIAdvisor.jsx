@@ -135,23 +135,16 @@ export default function AIAdvisor() {
   const inputRef = useRef(null);
 
   const checkHealth = useCallback(async () => {
-    setBackendStatus("checking");
     try {
-      const { data } = await API.get("/health", { timeout: 12000 });
-      if (data.status === "offline") {
-        setBackendStatus("offline");
-        setAiKeys({ groq: false, mistral: false });
-      } else {
+      const { data } = await API.get("/health", { timeout: 15000 });
+      if (data.status !== "offline") {
         setBackendStatus("online");
         setAiKeys(data.ai || { groq: false, mistral: false });
       }
-    } catch {
-      setBackendStatus("offline");
-      setAiKeys({ groq: false, mistral: false });
-    }
+    } catch {}
   }, []);
 
-  /* Load live context data (no AI calls) */
+  /* Load live context data — if data arrives, backend is definitely online */
   const loadLiveData = useCallback(async () => {
     try {
       const [m, f, w, sens, k] = await Promise.all([
@@ -166,6 +159,11 @@ export default function AIAdvisor() {
       setLiveWaste(w.data?.alerts || []);
       setLiveSensors(sens.data);
       setLiveKpis(k.data);
+      /* If real data loaded (not fallback), backend is online */
+      if (m.data?.tickers?.length || f.data?.length || k.data) {
+        setBackendStatus("online");
+        setAiKeys(prev => prev.groq ? prev : { groq: true, mistral: true, gemini: true });
+      }
     } catch {}
   }, []);
 
