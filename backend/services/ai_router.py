@@ -139,30 +139,56 @@ async def ask_groq_vision(image_base64: str, herb_name: str = "", image_type: st
     """Send image + text prompt to Groq vision model."""
     if not settings.GROQ_API_KEY:
         return "{}"
+    # Visual fingerprints for each of the 9 supported herbs
+    HERB_VISUAL = {
+        "Basil":     "broad oval leaves, deep to bright green, smooth surface, slightly glossy, strong upright stems",
+        "Mint":      "small to medium oval leaves with serrated edges, bright green, slightly wrinkled texture, square stems",
+        "Rosemary":  "needle-like narrow leaves, dark green on top / pale underside, woody stems, dense clusters",
+        "Thyme":     "very tiny oval leaves, grey-green colour, thin woody stems, leaves arranged in opposite pairs",
+        "Coriander": "flat feathery leaves, bright fresh green, delicate lacy edges (like flat parsley but rounder)",
+        "Lettuce":   "large ruffled or smooth broad leaves, pale to mid-green or red-tinged, crisp and watery-looking",
+        "Spinach":   "dark green oval leaves, smooth or slightly crinkled, thick midrib, short stems",
+        "Chives":    "long hollow tubular grass-like leaves, bright green, uniform thin cylinders standing upright",
+        "Parsley":   "bright green curly or flat leaves, deeply divided, crisp texture, multi-branched stems",
+    }
+    herb_visual_hint = HERB_VISUAL.get(herb_name, "green plant leaves")
+    supported = ", ".join(HERB_VISUAL.keys())
+
     prompt_text = (
-        f"You are a strict agricultural quality inspector. The user claims this image shows: {herb_name or 'an herb'}.\n\n"
-        "STEP 1 — Validate the image:\n"
-        "If the image does NOT show any plant, herb, or vegetable (e.g. it's a face, object, random photo, "
-        "screenshot, or is too dark/blurry to assess), you MUST set invalid_image:true and quality_score:0. "
-        "Do NOT fabricate a plant inspection for non-plant images.\n\n"
-        "STEP 2 — If it IS a plant/herb, be a strict inspector. Deduct heavily for:\n"
-        "- Yellowing or browning leaves\n"
-        "- Wilting or drooping stems\n"
-        "- Pest holes, bite marks, or visible insects\n"
-        "- Mold, slime, rot, or dark spots\n"
-        "- Dryness, curling, or pale colour\n\n"
-        "Grading (strict — do NOT round up):\n"
-        "Premium 85-100: Perfect, vibrant, zero visible issues\n"
-        "Good 65-84: Minor cosmetic issues only, still market-ready\n"
-        "Fair 45-64: Noticeable wilt, slight yellowing, minor pest marks\n"
-        "Poor 25-44: Significant wilt, yellowing/browning, moderate damage\n"
-        "Spoiled 0-24: Mold, rot, severe damage, unsafe to serve\n\n"
-        "Return ONLY valid JSON, no markdown:\n"
-        '{"invalid_image":false,"quality_score":0-100,"grade":"Premium/Good/Fair/Poor/Spoiled",'
-        '"confidence":0-100,"issues":["specific visible issues or empty array"],'
-        '"freshness_estimate":"X-Y days remaining","color_analysis":"specific colour/texture description",'
+        f"You are an expert agricultural quality inspector for AgriIntel urban herb farm.\n"
+        f"This system only handles 9 herbs: {supported}.\n\n"
+
+        f"The user selected herb: {herb_name or 'Unknown'}.\n"
+        f"Visual profile of {herb_name or 'this herb'}: {herb_visual_hint}.\n\n"
+
+        "STEP 1 — IMAGE VALIDATION (critical):\n"
+        f"Look at the image carefully. Ask: does this image show {herb_name or 'a supported herb'}?\n"
+        "Set invalid_image:true if ANY of these are true:\n"
+        "  - The image is a screenshot, UI, text, chart, diagram, or computer screen\n"
+        "  - The image shows a person, face, animal, vehicle, building, or non-plant object\n"
+        "  - The image shows cooked food, a dish, or processed product\n"
+        "  - The image is too dark, blurry, or low-resolution to identify the plant\n"
+        "  - The plant does NOT visually match ANY of the 9 supported herbs\n"
+        "If invalid_image is true, stop — return quality_score:0, do not fabricate herb data.\n\n"
+
+        "STEP 2 — HERB MATCH CHECK:\n"
+        f"If the image shows a herb but it does NOT look like {herb_name}, still analyse it but note the mismatch in issues.\n\n"
+
+        "STEP 3 — QUALITY INSPECTION (be strict, do NOT round up scores):\n"
+        "Inspect leaf colour, texture, stem condition, and any visible damage:\n"
+        "  Premium  85-100: Vibrant colour, firm leaves, zero defects — restaurant-ready\n"
+        "  Good     65-84 : Slight cosmetic marks only, still fully market-ready\n"
+        "  Fair     45-64 : Noticeable wilt, yellowing, or minor pest marks — use today\n"
+        "  Poor     25-44 : Significant yellowing/browning, wilting, moderate pest damage\n"
+        "  Spoiled   0-24 : Mold, rot, slime, severe damage — do not serve\n\n"
+
+        "Return ONLY valid JSON (no markdown, no extra text):\n"
+        '{"invalid_image":false,"quality_score":0,"grade":"Premium/Good/Fair/Poor/Spoiled",'
+        '"confidence":0,"issues":["list specific visible defects or empty array"],'
+        '"freshness_estimate":"X-Y days remaining",'
+        '"color_analysis":"describe exact colour and texture you see",'
         '"wilt_detected":false,"pest_damage":false,'
-        '"recommendation":"one specific actionable recommendation",'
+        '"recommendation":"one specific actionable step for this herb",'
         '"refund_eligible":false,"refund_percentage":0}'
     )
     try:
