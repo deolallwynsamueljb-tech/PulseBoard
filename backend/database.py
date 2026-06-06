@@ -8,7 +8,7 @@ if settings.MONGO_USERNAME and settings.MONGO_PASSWORD:
     MONGODB_URL = (
         f"mongodb+srv://{quote_plus(settings.MONGO_USERNAME)}"
         f":{quote_plus(settings.MONGO_PASSWORD)}"
-        f"@{settings.MONGO_HOST}/?appName=Cluster0"
+        f"@{settings.MONGO_HOST}/?retryWrites=true&w=majority&authSource=admin&appName=Cluster0"
     )
 else:
     MONGODB_URL = settings.MONGODB_URL
@@ -25,6 +25,7 @@ async def check_connection():
     if db is None:
         print("❌ No MongoDB credentials configured")
         return False
+    print(f"🔌 Connecting as user: {settings.MONGO_USERNAME!r} host: {settings.MONGO_HOST!r}")
     try:
         await db.command("ping")
         print("✅ MongoDB connected!")
