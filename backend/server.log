@@ -1,0 +1,3 @@
+[OK] MongoDB connected
+INFO:     127.0.0.1:63955 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62466 - "GET /docs HTTP/1.1" 200 OK
