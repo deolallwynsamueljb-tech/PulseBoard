@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, NavLink, useNavigate, useLocation, Link } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, X, Sun, Moon, Globe, BrainCircuit, Send, ChevronRight, Mic, MicOff, Camera } from "lucide-react";
+import { Bell, X, Sun, Moon, Globe, BrainCircuit, Send, ChevronRight, Mic, MicOff, Camera, Menu, LayoutDashboard, BarChart3, Leaf, Trash2, MessageSquare } from "lucide-react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LangProvider, useLang, LANGS } from "./context/LangContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
@@ -65,7 +65,7 @@ function GlobalControls() {
   const cur = LANGS.find(l => l.code === lang) || LANGS[0];
 
   return (
-    <div ref={ref} className="fixed top-3 right-4 z-50 flex items-center gap-1.5">
+    <div ref={ref} className="fixed top-2 md:top-3 right-2 md:right-4 z-50 flex items-center gap-1 md:gap-1.5">
 
       {/* Language dropdown */}
       <div className="relative">
@@ -355,7 +355,7 @@ function AIFab() {
         onClick={() => setOpen(p => !p)}
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.94 }}
-        className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full backdrop-blur-sm border shadow-2xl flex items-center justify-center transition-colors ${
+        className={`fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 w-12 h-12 md:w-14 md:h-14 rounded-full backdrop-blur-sm border shadow-2xl flex items-center justify-center transition-colors ${
           open
             ? "bg-zinc-800/95 border-zinc-600 shadow-black/30"
             : "bg-emerald-600/85 hover:bg-emerald-500/95 border-emerald-400/30 shadow-emerald-500/30"
@@ -563,7 +563,7 @@ function FarmerVoiceFab() {
       <motion.button
         onClick={() => open ? (window.speechSynthesis.cancel(), setOpen(false)) : startVoice()}
         whileHover={{ scale:1.08 }} whileTap={{ scale:0.94 }}
-        className={`fixed bottom-6 left-6 z-50 w-14 h-14 rounded-full backdrop-blur-sm border shadow-2xl flex items-center justify-center transition-colors ${
+        className={`fixed bottom-20 md:bottom-6 left-4 md:left-6 z-50 w-12 h-12 md:w-14 md:h-14 rounded-full backdrop-blur-sm border shadow-2xl flex items-center justify-center transition-colors ${
           listening ? "bg-red-500/85 border-red-400/30 shadow-red-500/30 animate-pulse"
           : open     ? "bg-zinc-800/95 border-zinc-600"
                      : "bg-emerald-600/85 hover:bg-emerald-500/95 border-emerald-400/30 shadow-emerald-500/30"
@@ -582,25 +582,80 @@ function FarmerVoiceFab() {
   );
 }
 
+function MobileBottomNav() {
+  const { t } = useLang();
+  const NAV = [
+    { path: "/",          Icon: LayoutDashboard, label: "Home"      },
+    { path: "/freshness", Icon: Leaf,            label: "Fresh"     },
+    { path: "/market",    Icon: BarChart3,        label: "Market"   },
+    { path: "/waste",     Icon: Trash2,           label: "Waste"    },
+    { path: "/pulse",     Icon: MessageSquare,    label: "Chefs"    },
+  ];
+  return (
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-surface-900 border-t border-surface-600 flex safe-area-bottom">
+      {NAV.map(({ path, Icon, label }) => (
+        <NavLink
+          key={path}
+          to={path}
+          end={path === "/"}
+          className={({ isActive }) =>
+            `flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] font-semibold transition-all ${
+              isActive ? "text-emerald-400" : "text-zinc-500"
+            }`
+          }
+        >
+          {({ isActive }) => (
+            <>
+              <Icon size={18} className={isActive ? "text-emerald-400" : "text-zinc-600"} />
+              <span>{label}</span>
+            </>
+          )}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
 function Layout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   return (
     <div className="flex h-screen bg-surface-950 overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto">
-        <Routes>
-          <Route path="/"          element={<Dashboard />}        />
-          <Route path="/analytics" element={<Analytics />}        />
-          <Route path="/pulse"     element={<ChefFeedback />}     />
-          <Route path="/advisor"   element={<AIAdvisor />}        />
-          <Route path="/freshness" element={<FreshnessTracker />} />
-          <Route path="/market"    element={<StockMarket />}      />
-          <Route path="/waste"     element={<WastePredictor />}   />
-          <Route path="/simple"        element={<SimpleView />}     />
-          <Route path="*"          element={<Navigate to="/" />}  />
-        </Routes>
-      </main>
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Mobile top header */}
+        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-surface-900 border-b border-surface-600 flex-shrink-0 z-20">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="w-8 h-8 rounded-lg bg-surface-800 border border-surface-600 flex items-center justify-center text-zinc-400 hover:text-zinc-100 transition-all"
+          >
+            <Menu size={16} />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-emerald-600 flex items-center justify-center">
+              <span className="text-white text-[10px] font-black">A</span>
+            </div>
+            <span className="text-zinc-100 font-bold text-sm">AgriIntel</span>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
+          <Routes>
+            <Route path="/"          element={<Dashboard />}        />
+            <Route path="/analytics" element={<Analytics />}        />
+            <Route path="/pulse"     element={<ChefFeedback />}     />
+            <Route path="/advisor"   element={<AIAdvisor />}        />
+            <Route path="/freshness" element={<FreshnessTracker />} />
+            <Route path="/market"    element={<StockMarket />}      />
+            <Route path="/waste"     element={<WastePredictor />}   />
+            <Route path="/simple"    element={<SimpleView />}       />
+            <Route path="*"          element={<Navigate to="/" />}  />
+          </Routes>
+        </main>
+
+        <MobileBottomNav />
+      </div>
       <GlobalControls />
       <AIFab />
       <FarmerVoiceFab />
