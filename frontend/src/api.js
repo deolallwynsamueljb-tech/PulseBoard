@@ -43,6 +43,7 @@ const FALLBACK_MAP = {
   "/waste/ai":            FALLBACK.wasteAI,
   "/feedback/":           [],
   "/feedback":            [],
+  "/ai/chat":             { reply: "The AI advisor requires the backend server. Please ensure the backend is running or contact support.", model: "offline" },
   "/ai/harvest-predict":  {
     predictions:[
       {herb:"Basil",     best_price_day:"June 8",  best_fresh_day:"June 7",  price_tip:"Harvest Jun 8 for peak ₹294/kg demand during weekend menus",      fresh_tip:"Harvest Jun 7 for maximum 5.2-day shelf life"},

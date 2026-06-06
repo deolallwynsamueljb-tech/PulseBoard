@@ -10,8 +10,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "https://pulseboard-gamma-cyan.vercel.app",
+        "https://frontend-zeta-two-37.vercel.app",
     ],
-    allow_origin_regex=r"https://pulseboard.*\.vercel\.app",
+    allow_origin_regex=r"https://(pulseboard|frontend).*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
