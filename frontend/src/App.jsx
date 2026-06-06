@@ -264,7 +264,7 @@ function AIFab() {
             animate={{ opacity:1, scale:1, y:0 }}
             exit={{ opacity:0, scale:0.92, y:12 }}
             transition={{ type:"spring", stiffness:400, damping:28 }}
-            className="fixed bottom-24 right-6 z-50 w-80 flex flex-col bg-zinc-900/97 backdrop-blur-xl border border-zinc-700 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden"
+            className="fixed bottom-36 md:bottom-24 right-4 md:right-6 z-50 w-[calc(100vw-2rem)] max-w-[320px] flex flex-col bg-zinc-900/97 backdrop-blur-xl border border-zinc-700 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden"
             style={{ maxHeight:"420px" }}
           >
             {/* Header */}
@@ -479,7 +479,7 @@ function FarmerVoiceFab() {
             animate={{ opacity:1, scale:1, y:0 }}
             exit={{ opacity:0, scale:0.92, y:12 }}
             transition={{ type:"spring", stiffness:400, damping:28 }}
-            className="fixed bottom-24 left-6 z-50 w-72 bg-zinc-900/97 backdrop-blur-xl border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
+            className="fixed bottom-36 md:bottom-24 left-4 md:left-6 z-50 w-[calc(100vw-2rem)] max-w-[288px] bg-zinc-900/97 backdrop-blur-xl border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
           >
             <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-zinc-800">
               <div className="flex items-center gap-2">

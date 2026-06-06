@@ -161,11 +161,11 @@ export default function Dashboard() {
   const SENSOR_ICONS = { temperature:Thermometer, humidity:Wind, co2:Activity, light:Sun, ph:Layers };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-3 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
-      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-center justify-between">
+      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-black text-zinc-100 tracking-tight">{t.pg_dash_title}</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-100 tracking-tight">{t.pg_dash_title}</h1>
           <p className="text-zinc-500 text-sm mt-0.5">{t.pg_dash_sub}</p>
         </div>
         <div className="flex items-center gap-3">
@@ -222,7 +222,7 @@ export default function Dashboard() {
       </div>
 
       {/* Revenue Chart + Health Score */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.3 }}
           className="xl:col-span-2 bg-surface-800 border border-surface-600 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">

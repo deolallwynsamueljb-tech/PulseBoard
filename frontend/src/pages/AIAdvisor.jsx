@@ -195,11 +195,11 @@ export default function AIAdvisor() {
   const excessHerbs = liveWaste.filter(w => w.excess_kg > 0).length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-3 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-5">
       {/* Header */}
-      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-start justify-between">
+      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-black text-zinc-100 tracking-tight flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-100 tracking-tight flex items-center gap-2">
             <BrainCircuit size={22} className="text-emerald-400"/> {t.pg_advisor_title}
           </h1>
           <p className="text-zinc-500 text-sm mt-0.5">{t.pg_advisor_sub}</p>
@@ -215,7 +215,7 @@ export default function AIAdvisor() {
         <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1 }}
           className="xl:col-span-3 flex flex-col gap-3">
 
-          <div className="bg-surface-800 border border-surface-600 rounded-2xl h-[460px] overflow-y-auto p-5 space-y-4 scroll-smooth">
+          <div className="bg-surface-800 border border-surface-600 rounded-2xl h-[320px] sm:h-[460px] overflow-y-auto p-5 space-y-4 scroll-smooth">
             <AnimatePresence initial={false}>
               {messages.map((m,i) => <ChatBubble key={i} role={m.role} text={m.text}/>)}
               {loading && (

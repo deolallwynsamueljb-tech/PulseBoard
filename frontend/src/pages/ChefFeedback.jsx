@@ -100,7 +100,7 @@ Sent via AgriIntel PulseBoard Chef Connect
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-3 sm:p-6 max-w-5xl mx-auto">
 
       {/* Header */}
       <div className="mb-7">
@@ -115,7 +115,7 @@ Sent via AgriIntel PulseBoard Chef Connect
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label:"Chef Partners",   value:"18",   icon: ChefHat,    color:"amber"   },
             { label:"Avg Rating",      value:"4.7★",  icon: Star,       color:"yellow"  },

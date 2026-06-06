@@ -278,11 +278,11 @@ export default function FreshnessTracker() {
   const avgDays   = herbs.length ? +(herbs.reduce((s,h)=>s + predictAdjusted(h.freshness_days, displayTemp, displayHumid), 0) / herbs.length).toFixed(1) : 0;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-3 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-5">
       {/* Header */}
-      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-start justify-between">
+      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-black text-zinc-100 tracking-tight flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-100 tracking-tight flex items-center gap-2">
             <Leaf size={20} className="text-emerald-400"/> {t.pg_fresh_title}
           </h1>
           <p className="text-zinc-500 text-sm mt-0.5">{t.pg_fresh_sub}</p>

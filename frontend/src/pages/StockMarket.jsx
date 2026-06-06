@@ -218,11 +218,11 @@ export default function StockMarket() {
   const topGainer = data?.tickers?.reduce((a,b)=>a.change>b.change?a:b,data?.tickers[0]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-3 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-5">
       {/* Header */}
-      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-start justify-between">
+      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-black text-zinc-100 tracking-tight flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-100 tracking-tight flex items-center gap-2">
             <Activity size={20} className="text-sky-400"/> {t.pg_market_title}
           </h1>
           <p className="text-zinc-500 text-sm mt-0.5">{t.pg_market_sub}</p>
@@ -268,7 +268,7 @@ export default function StockMarket() {
           <h2 className="text-sm font-bold text-zinc-200">Order Calculator</h2>
           <span className="text-[10px] text-zinc-500 bg-surface-700 px-2 py-0.5 rounded-md">Click any herb card to select</span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
           <div>
             <label className="text-zinc-500 text-xs block mb-1.5">Selected Herb</label>
             <div className={`bg-surface-700 border rounded-xl px-3 py-2.5 text-sm font-semibold ${selected ? "text-zinc-100 border-emerald-500/40" : "text-zinc-600 border-surface-600"}`}>
@@ -306,7 +306,7 @@ export default function StockMarket() {
             onClick={()=>setPendingAlert(null)}>
             <motion.div initial={{ scale:0.95, opacity:0 }} animate={{ scale:1, opacity:1 }} exit={{ scale:0.95, opacity:0 }}
               onClick={e=>e.stopPropagation()}
-              className="bg-surface-800 border border-surface-500 rounded-2xl p-6 w-80 shadow-2xl">
+              className="bg-surface-800 border border-surface-500 rounded-2xl p-6 w-[calc(100vw-2rem)] max-w-sm shadow-2xl">
               <h3 className="text-zinc-100 font-bold mb-1">Set Price Alert</h3>
               <p className="text-zinc-500 text-sm mb-4">Get notified when <span className="text-emerald-400">{pendingAlert}</span> reaches your target price.</p>
               <div className="mb-4">

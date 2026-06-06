@@ -83,15 +83,15 @@ export default function Analytics() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="xl:flex xl:gap-6 xl:items-start">
+    <div className="p-3 sm:p-6 max-w-7xl mx-auto">
+      <div className="xl:flex xl:gap-6 xl:items-start space-y-5 xl:space-y-0">
       {/* ── Main content column ── */}
       <div className="flex-1 min-w-0 space-y-5">
 
       {/* Header */}
-      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-start justify-between">
+      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-black text-zinc-100 tracking-tight">{t.nav_analytics}</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-100 tracking-tight">{t.nav_analytics}</h1>
           <p className="text-zinc-500 text-sm mt-0.5">{t.pg_analytics_sub}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -331,7 +331,7 @@ export default function Analytics() {
                 <Line type="monotone" dataKey="yield" stroke="#10b981" strokeWidth={2.5} dot={{ fill:"#10b981",r:5,strokeWidth:0 }}/>
               </ComposedChart>
             </ResponsiveContainer>
-            <div className="grid grid-cols-4 gap-3 mt-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
               {forecast.forecast.map((f,i)=>(
                 <div key={i} className="bg-surface-700 border border-surface-600 rounded-xl p-3.5 text-center">
                   <p className="text-zinc-500 text-xs mb-1 font-medium">{f.week}</p>
