@@ -2,17 +2,34 @@
   "version": 2,
   "builds": [
     {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist",
+        "buildCommand": "npm run build"
+      }
+    },
+    {
       "src": "api/index.py",
       "use": "@vercel/python",
       "config": {
-        "includeFiles": [
-          "backend/**",
-          "!backend/ml/*.pkl"
-        ]
+        "includeFiles": ["backend/**"]
       }
     }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "api/index.py" }
+    { "src": "/health",          "dest": "/api/index.py" },
+    { "src": "/kpis(.*)",        "dest": "/api/index.py" },
+    { "src": "/analytics(.*)",   "dest": "/api/index.py" },
+    { "src": "/feedback(.*)",    "dest": "/api/index.py" },
+    { "src": "/ai(.*)",          "dest": "/api/index.py" },
+    { "src": "/sensors(.*)",     "dest": "/api/index.py" },
+    { "src": "/freshness(.*)",   "dest": "/api/index.py" },
+    { "src": "/market(.*)",      "dest": "/api/index.py" },
+    { "src": "/waste(.*)",       "dest": "/api/index.py" },
+    { "src": "/auth(.*)",        "dest": "/api/index.py" },
+    { "src": "/ml(.*)",          "dest": "/api/index.py" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)",            "dest": "/index.html" }
   ]
 }

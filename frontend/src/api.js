@@ -2,7 +2,7 @@ import axios from "axios";
 import { FALLBACK } from "./lib/fallback";
 
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8001",
+  baseURL: import.meta.env.VITE_API_URL || "",
   timeout: 8000,
 });
 
