@@ -1,18 +1,22 @@
 import asyncio, math, random, time
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from routes import auth, kpis, analytics, feedback, ai, sensors, freshness, market, waste, ml
+from database import check_connection, client
 
-app = FastAPI(title="AgriIntel API", version="2.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await check_connection()
+    yield
+    if client:
+        client.close()
+
+app = FastAPI(title="AgriIntel API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "https://pulseboard-gamma-cyan.vercel.app",
-        "https://frontend-zeta-two-37.vercel.app",
-    ],
-    allow_origin_regex=r"https://(pulseboard|frontend).*\.vercel\.app",
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -24,11 +28,20 @@ for router in [auth.router, kpis.router, analytics.router, feedback.router,
     app.include_router(router)
 
 @app.get("/health")
-def health():
+async def health():
     from config import settings
+    from database import db
+    mongo_ok = False
+    if db:
+        try:
+            await db.command("ping")
+            mongo_ok = True
+        except:
+            pass
     return {
         "status": "ok",
         "service": "AgriIntel API v2.0.0",
+        "mongodb": "connected" if mongo_ok else "disconnected",
         "ai": {
             "groq":    bool(settings.GROQ_API_KEY),
             "mistral": bool(settings.MISTRAL_API_KEY),

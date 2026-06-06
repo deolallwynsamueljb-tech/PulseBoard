@@ -1,20 +1,23 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-from config import settings
+import os
 
-class _DB:
-    client: AsyncIOMotorClient = None
-    db = None
+MONGODB_URL = os.getenv("MONGODB_URL", "")
+DB_NAME     = os.getenv("DB_NAME", "agriintel")
 
-_db = _DB()
+client = AsyncIOMotorClient(MONGODB_URL) if MONGODB_URL else None
+db     = client[DB_NAME] if client else None
 
-async def connect():
-    _db.client = AsyncIOMotorClient(settings.MONGODB_URL)
-    _db.db = _db.client[settings.DB_NAME]
-    print("[OK] MongoDB connected")
-
-async def disconnect():
-    if _db.client:
-        _db.client.close()
+async def check_connection():
+    if not db:
+        print("❌ No MONGODB_URL set")
+        return False
+    try:
+        await db.command("ping")
+        print("✅ MongoDB connected!")
+        return True
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
+        return False
 
 def get_db():
-    return _db.db
+    return db
