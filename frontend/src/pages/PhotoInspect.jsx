@@ -55,6 +55,11 @@ export default function PhotoInspect() {
           herb_name: herb,
           image_type: mimeType,
         });
+        if (data.invalid_image) {
+          toast.error("Not a herb photo — please upload a clear herb or plant image", { duration: 5000 });
+          setLoading(false);
+          return;
+        }
         setResult(data);
         if (data.refund_eligible) {
           toast.success(`${data.refund_percentage}% refund eligible — quality issue detected`, { duration: 5000 });

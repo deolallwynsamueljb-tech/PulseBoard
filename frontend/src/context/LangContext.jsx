@@ -12,7 +12,7 @@ export const LANGS = [
   { code:"gu", label:"ગુજરાતી",    flag:"ગ"   },
 ];
 
-const HERBS = {
+export const HERBS = {
   en: { Basil:"Basil",    Mint:"Mint",     Rosemary:"Rosemary", Thyme:"Thyme",     Coriander:"Coriander", Lettuce:"Lettuce",    Spinach:"Spinach",    Chives:"Chives",  Parsley:"Parsley"   },
   ta: { Basil:"துளசி",    Mint:"புதினா",   Rosemary:"ரோஸ்மேரி", Thyme:"தைம்",     Coriander:"கொத்தமல்லி",Lettuce:"கீரை",      Spinach:"பசலை கீரை", Chives:"சைவ்ஸ்",  Parsley:"பார்ஸ்லி"  },
   hi: { Basil:"तुलसी",    Mint:"पुदीना",   Rosemary:"रोज़मेरी",  Thyme:"थाइम",    Coriander:"धनिया",     Lettuce:"सलाद पत्ता",Spinach:"पालक",      Chives:"चाइव्स",  Parsley:"अजमोद"     },
