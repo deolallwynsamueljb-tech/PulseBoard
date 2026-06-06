@@ -172,7 +172,10 @@ export default function AIAdvisor() {
         history: messages.slice(-6).map(m => ({ role:m.role, content:m.text })),
         live_data,
       }, { timeout: 40000 });
-      setMessages(p => [...p, { role:"ai", text:data.reply }]);
+      const reply = data.reply && data.reply.trim() && data.reply.trim() !== "{}" && data.reply.trim() !== "{}"
+        ? data.reply
+        : "The AI is temporarily unavailable — please try again in a moment. (Backend may be rate-limited.)";
+      setMessages(p => [...p, { role:"ai", text:reply }]);
     } catch (err) {
       const isTimeout = err?.code === "ECONNABORTED" || err?.message?.includes("timeout");
       const msg = isTimeout
