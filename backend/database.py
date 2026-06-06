@@ -22,7 +22,7 @@ except Exception as e:
     db     = None
 
 async def check_connection():
-    if not db:
+    if db is None:
         print("❌ No MongoDB credentials configured")
         return False
     try:
