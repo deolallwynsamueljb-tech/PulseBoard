@@ -3,19 +3,23 @@ AgriIntel ML Routes — Random Forest Freshness Predictor
 Trained model: 200 trees, R2=0.799, MAE=4.93
 """
 import os
-import joblib
-import numpy as np
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from deps import current_user
 
 router = APIRouter(prefix="/ml", tags=["ml"])
 
-# Load model once at startup
-_BASE = os.path.join(os.path.dirname(__file__), "..", "ml")
-_model = joblib.load(os.path.join(_BASE, "freshness_model.pkl"))
-_meta  = joblib.load(os.path.join(_BASE, "model_meta.pkl"))
-_le    = _meta["label_encoder"]
+# Load model — optional (not available on Vercel serverless due to size limits)
+_model = _meta = _le = None
+try:
+    import joblib
+    import numpy as np
+    _BASE  = os.path.join(os.path.dirname(__file__), "..", "ml")
+    _model = joblib.load(os.path.join(_BASE, "freshness_model.pkl"))
+    _meta  = joblib.load(os.path.join(_BASE, "model_meta.pkl"))
+    _le    = _meta["label_encoder"]
+except Exception:
+    pass  # ML model unavailable (Vercel) — endpoints return 503
 
 
 class FreshnessInput(BaseModel):
@@ -31,7 +35,10 @@ class FreshnessInput(BaseModel):
 @router.post("/predict-freshness")
 async def predict_freshness(req: FreshnessInput, user=Depends(current_user)):
     """Random Forest prediction: sensor readings → freshness score 0–100."""
-    # Encode herb name (unknown herb → nearest known)
+    if _model is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="ML model not available on this deployment. Run locally.")
+    import numpy as np
     known = list(_le.classes_)
     herb  = req.herb if req.herb in known else "Basil"
     herb_enc = int(_le.transform([herb])[0])
@@ -77,6 +84,8 @@ async def predict_freshness(req: FreshnessInput, user=Depends(current_user)):
 
 @router.get("/model-info")
 async def model_info(user=Depends(current_user)):
+    if _model is None:
+        return {"available": False, "message": "ML model runs locally only (scikit-learn too large for Vercel)"}
     """Return trained model metadata and performance metrics."""
     m = _meta["metrics"]
     return {
@@ -104,8 +113,11 @@ async def model_info(user=Depends(current_user)):
 
 @router.get("/batch-predict")
 async def batch_predict(user=Depends(current_user)):
+    if _model is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="ML model not available on this deployment.")
+    import numpy as np
     """Predict freshness for all 9 herbs at current sensor readings."""
-    # Use live sensor defaults (AgriIntel farm averages)
     sensors = dict(temperature=24.2, humidity=67.5, co2_ppm=419,
                    light_lux=845, ph=6.2, days_since_harvest=1.5)
 
