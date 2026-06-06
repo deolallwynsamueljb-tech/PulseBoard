@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  TrendingUp, TrendingDown, Minus, RefreshCw, Sparkles, Activity,
+  TrendingUp, TrendingDown, Minus, RefreshCw, Activity,
   Calculator, Bell, BellOff, ArrowUpRight, ArrowDownRight, ChevronUp, ChevronDown
 } from "lucide-react";
+import { useLang } from "../context/LangContext";
 import { LineChart, Line, ResponsiveContainer, Tooltip, AreaChart, Area } from "recharts";
 import API from "../api";
 import toast from "react-hot-toast";
@@ -149,10 +150,9 @@ function Ticker({ herb, price, change, trend, history, volume_kg, market_cap, se
 }
 
 export default function StockMarket() {
+  const { t } = useLang();
   const [data,     setData]     = useState(null);
-  const [insight,  setInsight]  = useState(null);
   const [loading,  setLoading]  = useState(true);
-  const [insLoad,  setInsLoad]  = useState(false);
   const [alerts,   setAlerts]   = useState({});
   const [alertInput, setAlertInput] = useState("");
   const [pendingAlert, setPendingAlert] = useState(null);
@@ -172,16 +172,7 @@ export default function StockMarket() {
     finally { setLoading(false); }
   }, []);
 
-  const loadInsight = async () => {
-    setInsLoad(true);
-    try {
-      const { data: d } = await API.get("/market/insight");
-      setInsight(d);
-    } catch {}
-    finally { setInsLoad(false); }
-  };
-
-  useEffect(() => { refresh(); loadInsight(); }, [refresh]);
+  useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => {
     const tick = setInterval(() => {
       setCountdown(c => {
@@ -232,9 +223,9 @@ export default function StockMarket() {
       <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-black text-zinc-100 tracking-tight flex items-center gap-2">
-            <Activity size={20} className="text-sky-400"/> Herb Stock Market
+            <Activity size={20} className="text-sky-400"/> {t.pg_market_title}
           </h1>
-          <p className="text-zinc-500 text-sm mt-0.5">Live herb prices · refreshes every 60s</p>
+          <p className="text-zinc-500 text-sm mt-0.5">{t.pg_market_sub}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl font-semibold border bg-surface-800 border-surface-600">
@@ -268,47 +259,6 @@ export default function StockMarket() {
           </motion.div>
         ))}
       </div>
-
-      {/* AI Insight */}
-      {(insight || insLoad) && (
-        <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-          className="bg-sky-500/5 border border-sky-500/20 rounded-2xl p-5">
-          {insLoad ? (
-            <div className="flex items-center gap-3">
-              <span className="w-4 h-4 border-2 border-sky-400/30 border-t-sky-400 rounded-full animate-spin"/>
-              <span className="text-zinc-500 text-sm">Generating market intelligence...</span>
-            </div>
-          ) : (
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-500/20 flex items-center justify-center flex-shrink-0">
-                <Sparkles size={13} className="text-sky-400"/>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <p className="text-sky-300 text-[11px] font-bold uppercase tracking-wide">Groq AI · Market Intelligence</p>
-                </div>
-                <p className="text-zinc-200 text-sm leading-relaxed mb-3">{insight?.insight}</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
-                    <p className="text-zinc-500 text-[10px] mb-1">Buy Signal</p>
-                    <p className="text-emerald-400 font-bold text-sm">{insight?.buy_signal}</p>
-                    <p className="text-zinc-500 text-[10px] mt-1">{insight?.opportunity}</p>
-                  </div>
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-                    <p className="text-zinc-500 text-[10px] mb-1">Risk Watch</p>
-                    <p className="text-red-400 font-bold text-sm">{insight?.sell_signal}</p>
-                    <p className="text-zinc-500 text-[10px] mt-1">{insight?.risk}</p>
-                  </div>
-                </div>
-              </div>
-              <button onClick={loadInsight} disabled={insLoad}
-                className="text-xs text-zinc-500 hover:text-sky-400 border border-surface-600 hover:border-sky-500/30 px-2.5 py-1.5 rounded-lg transition-all flex-shrink-0">
-                <RefreshCw size={11}/>
-              </button>
-            </div>
-          )}
-        </motion.div>
-      )}
 
       {/* Order Calculator */}
       <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.15 }}
@@ -382,7 +332,7 @@ export default function StockMarket() {
 
       {/* Sort controls */}
       <div className="flex items-center gap-2">
-        <span className="text-zinc-500 text-xs">Sort by:</span>
+        <span className="text-zinc-500 text-xs">{t.lbl_sort_by}</span>
         {[["name","Name"],["price","Price"],["change","Change %"]].map(([k,l])=>(
           <button key={k} onClick={()=>{ if(sortBy===k){setSortDir(d=>-d)}else{setSortBy(k);setSortDir(-1)} }}
             className={`text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all ${sortBy===k ? "bg-emerald-600 text-white font-semibold" : "bg-surface-800 text-zinc-400 border border-surface-600 hover:border-surface-500"}`}>
@@ -390,7 +340,7 @@ export default function StockMarket() {
             {sortBy===k&&(sortDir>0?<ChevronUp size={10}/>:<ChevronDown size={10}/>)}
           </button>
         ))}
-        <span className="text-zinc-600 text-xs ml-auto">{Object.keys(alerts).length} active alerts</span>
+        <span className="text-zinc-600 text-xs ml-auto">{Object.keys(alerts).length} {t.lbl_alerts}</span>
       </div>
 
       {/* Tickers */}
