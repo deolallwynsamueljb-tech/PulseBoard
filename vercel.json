@@ -1,5 +1,18 @@
 {
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": {
+        "includeFiles": [
+          "backend/**",
+          "!backend/ml/*.pkl"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "api/index.py" }
+  ]
 }
