@@ -8,6 +8,7 @@ import {
 import { TrendingUp, TrendingDown, Minus, Target, Award, RefreshCw, Filter, Download } from "lucide-react";
 import API from "../api";
 import toast from "react-hot-toast";
+import { useLang } from "../context/LangContext";
 
 const TT = {
   contentStyle:{ background:"#18181b", border:"1px solid #3f3f46", borderRadius:"10px", color:"#e4e4e7", fontSize:"12px" },
@@ -31,6 +32,7 @@ function downloadCSV(data, filename) {
 }
 
 export default function Analytics() {
+  const { t } = useLang();
   const [revenue,  setRevenue]  = useState([]);
   const [crops,    setCrops]    = useState([]);
   const [overview, setOverview] = useState(null);
@@ -81,12 +83,16 @@ export default function Analytics() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="xl:flex xl:gap-6 xl:items-start">
+      {/* ── Main content column ── */}
+      <div className="flex-1 min-w-0 space-y-5">
+
       {/* Header */}
       <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-black text-zinc-100 tracking-tight">Analytics</h1>
-          <p className="text-zinc-500 text-sm mt-0.5">Detailed farm performance · interactive filters</p>
+          <h1 className="text-2xl font-black text-zinc-100 tracking-tight">{t.nav_analytics}</h1>
+          <p className="text-zinc-500 text-sm mt-0.5">{t.pg_analytics_sub}</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => downloadCSV(filteredRevenue, "agriintel-revenue.csv")}
@@ -188,82 +194,40 @@ export default function Analytics() {
         ) : <div className="h-60 bg-surface-700 rounded-xl animate-pulse"/>}
       </motion.div>
 
-      {/* Crop Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <motion.div initial={{ opacity:0,y:12 }} animate={{ opacity:1,y:0 }} transition={{ delay:0.22 }}
-          className="bg-surface-800 border border-surface-600 rounded-2xl p-6">
-          <h2 className="text-sm font-bold text-zinc-200 mb-5">Revenue Share by Crop</h2>
-          {filteredCrops.length > 0 ? (
-            <div className="flex items-center gap-6">
-              <ResponsiveContainer width="44%" height={190}>
-                <PieChart>
-                  <Pie data={filteredCrops} cx="50%" cy="50%" innerRadius={48} outerRadius={78} dataKey="value" paddingAngle={2}>
-                    {filteredCrops.map((c,i)=>(
-                      <Cell key={i} fill={HERB_COLORS[c.name.toLowerCase()]||PIE_COLORS[i]}/>
-                    ))}
-                  </Pie>
-                  <Tooltip {...TT} formatter={(v)=>[`${v}%`, "Share"]}/>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex-1 space-y-3">
-                {filteredCrops.map((d,i)=>(
-                  <div key={i}>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{background:HERB_COLORS[d.name.toLowerCase()]||PIE_COLORS[i]}}/>
-                        <span className="text-zinc-300 font-medium">{d.name}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-zinc-200 font-bold">{d.value}%</span>
-                        <p className="text-zinc-600 text-[10px]">₹{d.revenue?.toLocaleString()}</p>
-                      </div>
-                    </div>
-                    <div className="h-1.5 bg-surface-600 rounded-full overflow-hidden">
-                      <motion.div initial={{width:0}} animate={{width:`${d.value}%`}} transition={{delay:0.4+i*0.1,duration:0.7,ease:"easeOut"}}
-                        className="h-full rounded-full" style={{background:HERB_COLORS[d.name.toLowerCase()]||PIE_COLORS[i]}}/>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : <div className="h-48 bg-surface-700 rounded-xl animate-pulse"/>}
-        </motion.div>
-
-        {/* WoW */}
-        <motion.div initial={{ opacity:0,y:12 }} animate={{ opacity:1,y:0 }} transition={{ delay:0.28 }}
-          className="bg-surface-800 border border-surface-600 rounded-2xl p-6">
-          <h2 className="text-sm font-bold text-zinc-200 mb-5">Week-over-Week</h2>
-          <div className="space-y-3">
-            {wow.map((w,i)=>{
-              const isGood=(w.change>0&&w.good==="up")||(w.change<0&&w.good==="down");
-              const pct = w.last_week > 0 ? Math.abs(((w.this_week-w.last_week)/w.last_week)*100).toFixed(1) : 0;
-              return (
-                <div key={i} className="bg-surface-700 rounded-xl p-3.5">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-zinc-400 text-xs font-medium">{w.metric}</p>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${isGood?"bg-emerald-500/10 text-emerald-400":"bg-red-500/10 text-red-400"}`}>
-                      {isGood?"+":"-"}{pct}%
-                    </span>
-                  </div>
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <span className="text-zinc-100 font-black text-xl tabular-nums">{w.this_week.toLocaleString()}</span>
-                      <span className="text-zinc-500 text-xs ml-1">{w.unit}</span>
-                    </div>
-                    <span className="text-zinc-600 text-xs">vs {w.last_week.toLocaleString()}{w.unit} last week</span>
-                  </div>
-                  <div className="mt-2 h-1.5 bg-surface-600 rounded-full overflow-hidden">
-                    <motion.div initial={{width:0}}
-                      animate={{width:`${Math.min((w.this_week/Math.max(w.this_week,w.last_week))*100,100)}%`}}
-                      transition={{delay:0.5+i*0.1,duration:0.7,ease:"easeOut"}}
-                      className={`h-full rounded-full ${isGood?"bg-emerald-500":"bg-red-500"}`}/>
-                  </div>
+      {/* Week-over-Week */}
+      <motion.div initial={{ opacity:0,y:12 }} animate={{ opacity:1,y:0 }} transition={{ delay:0.28 }}
+        className="bg-surface-800 border border-surface-600 rounded-2xl p-6">
+        <h2 className="text-sm font-bold text-zinc-200 mb-5">Week-over-Week</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {wow.map((w,i)=>{
+            const isGood=(w.change>0&&w.good==="up")||(w.change<0&&w.good==="down");
+            const pct = w.last_week > 0 ? Math.abs(((w.this_week-w.last_week)/w.last_week)*100).toFixed(1) : 0;
+            return (
+              <div key={i} className="bg-surface-700 rounded-xl p-3.5">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-zinc-400 text-xs font-medium">{w.metric}</p>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${isGood?"bg-emerald-500/10 text-emerald-400":"bg-red-500/10 text-red-400"}`}>
+                    {isGood?"+":"-"}{pct}%
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        </motion.div>
-      </div>
+                <div className="flex items-end justify-between">
+                  <div>
+                    <span className="text-zinc-100 font-black text-xl tabular-nums">{w.this_week.toLocaleString()}</span>
+                    <span className="text-zinc-500 text-xs ml-1">{w.unit}</span>
+                  </div>
+                  <span className="text-zinc-600 text-xs">vs {w.last_week.toLocaleString()}{w.unit} last week</span>
+                </div>
+                <div className="mt-2 h-1.5 bg-surface-600 rounded-full overflow-hidden">
+                  <motion.div initial={{width:0}}
+                    animate={{width:`${Math.min((w.this_week/Math.max(w.this_week,w.last_week))*100,100)}%`}}
+                    transition={{delay:0.5+i*0.1,duration:0.7,ease:"easeOut"}}
+                    className={`h-full rounded-full ${isGood?"bg-emerald-500":"bg-red-500"}`}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
 
       {/* Benchmarks + Goals */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -383,6 +347,55 @@ export default function Analytics() {
           </>
         ) : <div className="h-48 bg-surface-700 rounded-xl animate-pulse"/>}
       </motion.div>
+
+      </div>{/* end left column */}
+
+      {/* ── Revenue Share by Crop — floating right sidebar ── */}
+      <div className="hidden xl:block w-72 flex-shrink-0 sticky top-6 self-start" style={{marginRight:"-1.5rem"}}>
+        <motion.div initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }} transition={{ delay:0.3 }}
+          className="bg-surface-800 border border-emerald-500/25 rounded-2xl p-5 shadow-2xl shadow-emerald-500/5 ring-1 ring-emerald-500/10">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-2 h-2 rounded-full bg-emerald-400"/>
+            <h2 className="text-sm font-bold text-zinc-200">Revenue Share</h2>
+          </div>
+          {filteredCrops.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={155}>
+                <PieChart>
+                  <Pie data={filteredCrops} cx="50%" cy="50%" innerRadius={38} outerRadius={62} dataKey="value" paddingAngle={2}>
+                    {filteredCrops.map((c,i)=>(
+                      <Cell key={i} fill={HERB_COLORS[c.name.toLowerCase()]||PIE_COLORS[i]}/>
+                    ))}
+                  </Pie>
+                  <Tooltip {...TT} formatter={(v)=>[`${v}%`, "Share"]}/>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-2 mt-3">
+                {filteredCrops.slice(0,6).map((d,i)=>(
+                  <div key={i}>
+                    <div className="flex justify-between items-center text-[11px] mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{background:HERB_COLORS[d.name.toLowerCase()]||PIE_COLORS[i]}}/>
+                        <span className="text-zinc-300 font-medium">{d.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-zinc-200 font-bold">{d.value}%</span>
+                        {d.revenue && <p className="text-zinc-600 text-[10px]">₹{d.revenue.toLocaleString()}</p>}
+                      </div>
+                    </div>
+                    <div className="h-1 bg-surface-600 rounded-full overflow-hidden">
+                      <motion.div initial={{width:0}} animate={{width:`${d.value}%`}} transition={{delay:0.4+i*0.1,duration:0.7,ease:"easeOut"}}
+                        className="h-full rounded-full" style={{background:HERB_COLORS[d.name.toLowerCase()]||PIE_COLORS[i]}}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : <div className="h-40 bg-surface-700 rounded-xl animate-pulse"/>}
+        </motion.div>
+      </div>
+
+      </div>{/* end flex wrapper */}
     </div>
   );
 }

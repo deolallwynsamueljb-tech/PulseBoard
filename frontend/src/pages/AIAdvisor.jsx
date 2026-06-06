@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from "react";
+import { useLang } from "../context/LangContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Send, BrainCircuit, Sparkles, TrendingUp, AlertTriangle, Leaf,
-  RefreshCw, ChevronRight, Zap, Copy, Check
+  RefreshCw, ChevronRight, Zap, Copy, Check, Thermometer, Droplets,
+  Package, Activity
 } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../api";
 
 const QUICK = [
-  { label:"Basil yield",    q:"How can I increase basil yield this summer by 20%?" },
-  { label:"Top crops",      q:"Which 2 crops should I prioritise next month for maximum revenue?" },
-  { label:"Save water",     q:"How do I reduce water consumption by 15% without hurting yield?" },
-  { label:"Pricing",        q:"What price should I charge for premium basil to beat competitors?" },
-  { label:"More chefs",     q:"What's the fastest way to add 5 more chef partners this month?" },
-  { label:"Flash sale",     q:"Should I run a flash sale today? I have 8kg excess lettuce." },
+  { label:"Basil price",    q:"What is the current price of basil and how do I maximise revenue?" },
+  { label:"Freshness",      q:"Which herbs have the lowest freshness right now and what should I do?" },
+  { label:"Waste alert",    q:"What herbs have the most excess stock? Recommend a flash sale strategy." },
+  { label:"Sensors",        q:"What do the current sensor readings tell us about farm conditions?" },
+  { label:"Chef partners",  q:"We have 18 active chef partners. What's the fastest way to reach the target of 25?" },
+  { label:"Yield boost",    q:"How do I push monthly yield past 1,500 kg given current conditions?" },
 ];
 
 const PRIORITY_STYLE = {
@@ -34,7 +36,7 @@ function TypingDots() {
   );
 }
 
-function ChatBubble({ role, text, onCopy }) {
+function ChatBubble({ role, text }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     navigator.clipboard.writeText(text);
@@ -70,32 +72,87 @@ function ChatBubble({ role, text, onCopy }) {
   );
 }
 
+/* Build comprehensive live_data object from all fetched data */
+function buildLiveData(market, freshness, wasteData, sensors, kpis, demand) {
+  const out = {};
+  if (market?.length) {
+    out.prices  = Object.fromEntries(market.map(h => [h.herb, h.price]));
+    out.changes = Object.fromEntries(market.map(h => [h.herb, h.change ?? 0]));
+  }
+  if (freshness?.length) {
+    out.freshness = Object.fromEntries(freshness.map(h => [h.herb, h.freshness_days]));
+  }
+  if (wasteData?.length) {
+    const excess = {};
+    wasteData.forEach(w => { if (w.excess_kg > 0) excess[w.herb] = w.excess_kg; });
+    if (Object.keys(excess).length) out.waste = excess;
+  }
+  if (sensors) {
+    out.sensors = {
+      temperature: sensors.temperature?.value,
+      humidity:    sensors.humidity?.value,
+      co2:         sensors.co2?.value,
+      light:       sensors.light?.value,
+      ph:          sensors.ph?.value,
+    };
+  }
+  if (kpis) {
+    out.kpis = {
+      yield:    kpis.yield?.value,
+      water:    kpis.water?.value,
+      power:    kpis.power?.value,
+      delivery: kpis.delivery?.value,
+    };
+  }
+  if (demand?.alerts?.length) {
+    out.demand = demand.alerts.slice(0, 5);
+  }
+  return out;
+}
+
 export default function AIAdvisor() {
+  const { t } = useLang();
   const [messages, setMessages] = useState([{
     role:"ai",
-    text:"Hello! I'm AgriIntel AI — powered by Gemini 2.0 Flash + Groq Llama 70B.\n\nI have full context on your farm: crops, yield trends, revenue, sensor data, chef partnerships, and market prices. Ask me anything about optimising your urban herb farm."
+    text:"Hello! I'm AgriIntel AI — powered by Groq Llama 70B.\n\nI receive your complete live dashboard as context with every question: herb prices, freshness days, excess stock, sensor readings (temperature, humidity, CO₂), KPIs, and demand alerts.\n\nEvery answer I give uses your EXACT current data — not approximations. Ask me anything about your farm."
   }]);
-  const [input,    setInput]    = useState("");
-  const [loading,  setLoading]  = useState(false);
-  const [recs,     setRecs]     = useState([]);
-  const [demand,   setDemand]   = useState(null);
-  const [seasonal, setSeasonal] = useState(null);
-  const [activeTab,setActiveTab]= useState("recs");
-  const [recsLoad, setRecsLoad] = useState(false);
-  const endRef  = useRef(null);
+  const [input,       setInput]       = useState("");
+  const [loading,     setLoading]     = useState(false);
+  const [recs,        setRecs]        = useState([]);
+  const [demand,      setDemand]      = useState(null);
+  const [seasonal,    setSeasonal]    = useState(null);
+  const [activeTab,   setActiveTab]   = useState("recs");
+  const [recsLoad,    setRecsLoad]    = useState(false);
+  const [liveMarket,  setLiveMarket]  = useState([]);
+  const [liveFresh,   setLiveFresh]   = useState([]);
+  const [liveWaste,   setLiveWaste]   = useState([]);
+  const [liveSensors, setLiveSensors] = useState(null);
+  const [liveKpis,    setLiveKpis]    = useState(null);
+  const [contextTab,  setContextTab]  = useState("prices");
+  const endRef   = useRef(null);
   const inputRef = useRef(null);
 
   const loadPanels = async () => {
     setRecsLoad(true);
     try {
-      const [r,d,s] = await Promise.all([
+      const [r, d, s, m, f, w, sens, k] = await Promise.all([
         API.get("/ai/recommendations"),
-        API.get("/ai/demand-alerts"),
+        API.post("/ai/demand-alerts", { live_data: {} }),
         API.get("/ai/seasonal"),
+        API.get("/market/"),
+        API.get("/freshness/"),
+        API.get("/waste/"),
+        API.get("/sensors/"),
+        API.get("/kpis/"),
       ]);
       setRecs(r.data.recommendations || []);
       setDemand(d.data);
       setSeasonal(s.data);
+      setLiveMarket(m.data?.tickers || []);
+      setLiveFresh(f.data || []);
+      setLiveWaste(w.data?.alerts || []);
+      setLiveSensors(sens.data);
+      setLiveKpis(k.data);
     } catch {}
     finally { setRecsLoad(false); }
   };
@@ -109,24 +166,30 @@ export default function AIAdvisor() {
     setInput("");
     setLoading(true);
     try {
+      const live_data = buildLiveData(liveMarket, liveFresh, liveWaste, liveSensors, liveKpis, demand);
       const { data } = await API.post("/ai/chat", {
         message: q,
         history: messages.slice(-6).map(m => ({ role:m.role, content:m.text })),
-      });
+        live_data,
+      }, { timeout: 40000 });
       setMessages(p => [...p, { role:"ai", text:data.reply }]);
-    } catch {
-      toast.error("AI unavailable — retrying with fallback");
-      const fallback = `Based on AgriIntel farm data: For "${q}", I recommend focusing on Zone A for basil expansion (38% demand surge expected this summer) and reviewing Zone B irrigation. Your delivery time of 2.4hrs is a key differentiator — protect it.`;
-      setMessages(p => [...p, { role:"ai", text:fallback }]);
+    } catch (err) {
+      const isTimeout = err?.code === "ECONNABORTED" || err?.message?.includes("timeout");
+      const msg = isTimeout
+        ? "AI is taking longer than usual — please try again. (Tip: ask shorter questions for faster responses.)"
+        : "AI is temporarily unavailable. Check that the backend server is running on port 8001.";
+      setMessages(p => [...p, { role:"ai", text:msg }]);
     } finally {
       setLoading(false);
       inputRef.current?.focus();
     }
   };
 
-  const clearChat = () => {
-    setMessages([{ role:"ai", text:"Chat cleared. How can I help you with your farm today?" }]);
-  };
+  const clearChat = () => setMessages([{ role:"ai", text:"Chat cleared. How can I help you with your farm today?" }]);
+
+  const hasLive = liveMarket.length > 0;
+  const urgentFresh = liveFresh.filter(h => h.freshness_days < 2).length;
+  const excessHerbs = liveWaste.filter(w => w.excess_kg > 0).length;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-5">
@@ -134,15 +197,13 @@ export default function AIAdvisor() {
       <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-black text-zinc-100 tracking-tight flex items-center gap-2">
-            <BrainCircuit size={22} className="text-emerald-400"/> AI Advisor
+            <BrainCircuit size={22} className="text-emerald-400"/> {t.pg_advisor_title}
           </h1>
-          <p className="text-zinc-500 text-sm mt-0.5">
-            <span className="text-emerald-400 font-medium">Gemini 2.0 Flash</span> + <span className="text-violet-400 font-medium">Groq Llama 70B</span> · Farm-aware intelligence
-          </p>
+          <p className="text-zinc-500 text-sm mt-0.5">{t.pg_advisor_sub}</p>
         </div>
         <button onClick={clearChat}
           className="text-xs text-zinc-500 hover:text-zinc-300 border border-surface-600 hover:border-surface-500 bg-surface-800 px-3 py-1.5 rounded-xl transition-all">
-          Clear chat
+          {t.lbl_clear_chat}
         </button>
       </motion.div>
 
@@ -151,7 +212,6 @@ export default function AIAdvisor() {
         <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1 }}
           className="xl:col-span-3 flex flex-col gap-3">
 
-          {/* Chat history */}
           <div className="bg-surface-800 border border-surface-600 rounded-2xl h-[460px] overflow-y-auto p-5 space-y-4 scroll-smooth">
             <AnimatePresence initial={false}>
               {messages.map((m,i) => <ChatBubble key={i} role={m.role} text={m.text}/>)}
@@ -169,7 +229,6 @@ export default function AIAdvisor() {
             <div ref={endRef}/>
           </div>
 
-          {/* Quick prompts */}
           <div className="flex flex-wrap gap-1.5">
             {QUICK.map(({label,q},i)=>(
               <button key={i} onClick={() => ask(q)} disabled={loading}
@@ -179,19 +238,16 @@ export default function AIAdvisor() {
             ))}
           </div>
 
-          {/* Input */}
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <input ref={inputRef}
                 className="w-full bg-surface-800 border border-surface-600 rounded-xl px-4 py-3 text-zinc-200 text-sm placeholder-zinc-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/20 pr-10 transition-all"
-                placeholder="Ask about yield, pricing, waste, chefs, sensors..."
+                placeholder="Ask about yield, pricing, freshness, waste, sensors..."
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key==="Enter" && !e.shiftKey && ask()}
               />
-              {input.length > 0 && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-600">↵</span>
-              )}
+              {input.length > 0 && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-600">↵</span>}
             </div>
             <button onClick={() => ask()} disabled={loading || !input.trim()}
               className="flex items-center justify-center w-11 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-all">
@@ -203,6 +259,136 @@ export default function AIAdvisor() {
         {/* Right Intelligence Panel */}
         <motion.div initial={{ opacity:0, x:16 }} animate={{ opacity:1, x:0 }} transition={{ delay:0.2 }}
           className="xl:col-span-2 flex flex-col gap-4">
+
+          {/* Live Context panel */}
+          <div className="bg-violet-500/5 border border-violet-500/20 rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <p className="text-violet-300 text-xs font-bold uppercase tracking-wide">Live Context</p>
+                {hasLive && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">LIVE</span>}
+              </div>
+              <button onClick={loadPanels} disabled={recsLoad} className="text-[10px] text-zinc-600 hover:text-zinc-400 flex items-center gap-1 transition-colors">
+                <RefreshCw size={9} className={recsLoad?"animate-spin":""}/>Refresh
+              </button>
+            </div>
+
+            {/* Status badges */}
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {urgentFresh > 0 && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-full flex items-center gap-1">
+                  <Leaf size={7}/>{urgentFresh} urgent freshness
+                </span>
+              )}
+              {excessHerbs > 0 && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full flex items-center gap-1">
+                  <Package size={7}/>{excessHerbs} excess herbs
+                </span>
+              )}
+              {liveSensors && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-sky-500/10 text-sky-400 border border-sky-500/20 rounded-full flex items-center gap-1">
+                  <Activity size={7}/>sensors live
+                </span>
+              )}
+            </div>
+
+            {/* Mini tabs */}
+            <div className="flex gap-1 mb-3">
+              {[["prices","Prices"],["fresh","Fresh"],["waste","Waste"],["env","Sensors"]].map(([k,l])=>(
+                <button key={k} onClick={()=>setContextTab(k)}
+                  className={`flex-1 text-[9px] font-bold py-1 rounded-lg transition-all ${
+                    contextTab===k ? "bg-violet-600/30 text-violet-300 border border-violet-500/30" : "text-zinc-600 hover:text-zinc-400"
+                  }`}>{l}</button>
+              ))}
+            </div>
+
+            {/* Prices tab */}
+            {contextTab === "prices" && (
+              <div className="grid grid-cols-2 gap-1.5">
+                {(hasLive ? liveMarket : []).slice(0,6).map(h => (
+                  <div key={h.herb} className="bg-surface-800 rounded-lg px-2 py-1.5 flex justify-between gap-1 items-center">
+                    <span className="text-zinc-500 text-[10px]">{h.herb}</span>
+                    <div className="text-right">
+                      <span className="text-violet-300 font-bold text-[10px]">₹{h.price}</span>
+                      <span className={`text-[9px] ml-1 font-semibold ${(h.change??0) > 0 ? "text-emerald-400" : (h.change??0) < 0 ? "text-red-400" : "text-zinc-500"}`}>
+                        {(h.change??0) > 0 ? "▲" : (h.change??0) < 0 ? "▼" : "—"}{Math.abs(h.change??0).toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {!hasLive && <p className="text-zinc-600 text-[10px] col-span-2 py-2 text-center">Loading live prices...</p>}
+              </div>
+            )}
+
+            {/* Freshness tab */}
+            {contextTab === "fresh" && (
+              <div className="grid grid-cols-2 gap-1.5">
+                {liveFresh.slice(0,6).map(h => (
+                  <div key={h.herb} className={`rounded-lg px-2 py-1.5 flex justify-between items-center ${
+                    h.freshness_days < 2 ? "bg-red-500/10 border border-red-500/20" :
+                    h.freshness_days < 3 ? "bg-amber-500/10 border border-amber-500/20" :
+                    "bg-surface-800"
+                  }`}>
+                    <span className="text-zinc-400 text-[10px]">{h.herb}</span>
+                    <span className={`font-bold text-[10px] tabular-nums ${
+                      h.freshness_days < 2 ? "text-red-400" :
+                      h.freshness_days < 3 ? "text-amber-400" : "text-emerald-400"
+                    }`}>{h.freshness_days}d</span>
+                  </div>
+                ))}
+                {!liveFresh.length && <p className="text-zinc-600 text-[10px] col-span-2 py-2 text-center">Loading freshness...</p>}
+              </div>
+            )}
+
+            {/* Waste tab */}
+            {contextTab === "waste" && (
+              <div className="space-y-1.5">
+                {liveWaste.filter(w => w.excess_kg > 0).slice(0,5).map(w => (
+                  <div key={w.herb} className="flex items-center justify-between bg-surface-800 rounded-lg px-2.5 py-2">
+                    <span className="text-zinc-400 text-[10px]">{w.herb}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                        w.urgency==="Critical" ? "bg-red-500/15 text-red-400" :
+                        w.urgency==="High"     ? "bg-amber-500/15 text-amber-400" :
+                                                 "bg-zinc-800 text-zinc-400"
+                      }`}>{w.urgency}</span>
+                      <span className="text-amber-400 font-bold text-[10px]">{w.excess_kg}kg</span>
+                    </div>
+                  </div>
+                ))}
+                {!liveWaste.filter(w=>w.excess_kg>0).length && (
+                  <p className="text-zinc-600 text-[10px] py-2 text-center">No excess stock</p>
+                )}
+              </div>
+            )}
+
+            {/* Sensors tab */}
+            {contextTab === "env" && liveSensors && (
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { k:"temperature", label:"Temp", unit:"°C", color:"amber" },
+                  { k:"humidity",    label:"Humid", unit:"%", color:"sky" },
+                  { k:"co2",         label:"CO₂", unit:"ppm", color:"violet" },
+                  { k:"light",       label:"Light", unit:"lux", color:"yellow" },
+                  { k:"ph",          label:"pH", unit:"", color:"emerald" },
+                ].map(({ k, label, unit, color }) => {
+                  const s = liveSensors[k];
+                  if (!s) return null;
+                  return (
+                    <div key={k} className="bg-surface-800 rounded-lg px-2 py-1.5">
+                      <p className={`text-[9px] text-${color}-500/70 font-semibold`}>{label}</p>
+                      <p className={`text-${color}-300 font-black text-sm tabular-nums`}>{s.value}{unit}</p>
+                      <p className={`text-[9px] ${s.status==="Optimal"?"text-emerald-500":s.status==="High"?"text-red-400":"text-amber-400"}`}>{s.status}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {contextTab === "env" && !liveSensors && (
+              <p className="text-zinc-600 text-[10px] py-2 text-center">Loading sensor data...</p>
+            )}
+
+            <p className="text-zinc-700 text-[10px] mt-2 text-center">All data injected into every AI response</p>
+          </div>
 
           {/* Tab switcher */}
           <div className="flex bg-surface-800 border border-surface-600 rounded-xl p-1 gap-1">
@@ -216,7 +402,7 @@ export default function AIAdvisor() {
 
           <div className="overflow-y-auto max-h-[540px] space-y-3">
 
-            {/* Recommendations tab */}
+            {/* Recommendations */}
             {activeTab === "recs" && (
               <>
                 <div className="flex items-center justify-between px-1">
@@ -251,7 +437,7 @@ export default function AIAdvisor() {
               </>
             )}
 
-            {/* Demand Alerts tab */}
+            {/* Demand Alerts */}
             {activeTab === "demand" && demand && (
               <div className="space-y-3">
                 {demand.alerts?.map((a,i)=>(
@@ -264,57 +450,45 @@ export default function AIAdvisor() {
                     onClick={() => ask(`Demand alert: ${a.crop} demand is ${a.demand_change} in ${a.period}. What should I do?`)}>
                     <div className="flex justify-between items-start mb-2">
                       <p className="text-zinc-200 font-bold text-sm">{a.crop}</p>
-                      <span className={`text-xs font-black tabular-nums ${a.demand_change?.startsWith("+") ? "text-emerald-400" : "text-red-400"}`}>
-                        {a.demand_change}
-                      </span>
+                      <span className={`text-xs font-black tabular-nums ${a.demand_change?.startsWith("+") ? "text-emerald-400" : "text-red-400"}`}>{a.demand_change}</span>
                     </div>
                     <p className="text-zinc-400 text-xs mb-1">{a.reason}</p>
-                    <p className="text-zinc-500 text-xs">
-                      Action: <span className="text-zinc-300">{a.action}</span>
-                    </p>
+                    <p className="text-zinc-500 text-xs">Action: <span className="text-zinc-300">{a.action}</span></p>
                     <p className="text-zinc-600 text-[10px] mt-1">{a.period}</p>
                   </motion.div>
                 ))}
-                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
-                  <p className="text-emerald-400 text-xs font-bold">Total Opportunity</p>
-                  <p className="text-zinc-400 text-xs mt-0.5">Act on all alerts to maximise summer revenue</p>
-                </div>
               </div>
             )}
 
-            {/* Seasonal tab */}
+            {/* Seasonal */}
             {activeTab === "seasonal" && seasonal && (
               <div className="space-y-3">
-                <div className="bg-sky-500/5 border border-sky-500/20 rounded-2xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Leaf size={13} className="text-sky-400"/>
-                    <p className="text-sky-300 text-xs font-bold uppercase tracking-wide">Season Summary</p>
-                  </div>
-                  <p className="text-zinc-300 text-sm leading-relaxed">{seasonal.season_summary}</p>
-                </div>
-                {seasonal.predictions?.map((p,i)=>(
+                {seasonal.predictions?.map((p,i)=>{
+                  const demandPct = parseInt((p.demand_forecast||"0").replace(/[^0-9]/g,"")) || 0;
+                  const conf = p.confidence || "Medium";
+                  return (
                   <motion.div key={i} initial={{ opacity:0,x:12 }} animate={{ opacity:1,x:0 }} transition={{ delay:i*0.1 }}
                     className="bg-surface-800 border border-surface-600 rounded-2xl p-4 cursor-pointer hover:border-surface-500 transition-all"
-                    onClick={() => ask(`Seasonal prediction: ${p.herb} has ${p.demand_index}% demand index this season. How do I capitalise on this?`)}>
+                    onClick={() => ask(`Seasonal: ${p.herb} demand ${p.demand_forecast} — how do I capitalise?`)}>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-zinc-200 font-bold text-sm">{p.herb}</p>
                       <div className="flex items-center gap-2">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${
-                          p.season==="Peak" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
-                          p.season==="High" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
-                                              "bg-surface-700 text-zinc-400 border border-surface-600"
-                        }`}>{p.season}</span>
-                        <span className="text-zinc-200 font-black text-sm tabular-nums">{p.demand_index}%</span>
+                          conf==="High" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
+                                         "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                        }`}>{conf}</span>
+                        <span className="text-zinc-200 font-black text-sm tabular-nums">{p.demand_forecast}</span>
                       </div>
                     </div>
                     <div className="h-1.5 bg-surface-600 rounded-full overflow-hidden mb-2">
-                      <motion.div initial={{width:0}} animate={{width:`${p.demand_index}%`}}
+                      <motion.div initial={{width:0}} animate={{width:`${Math.min(demandPct,100)}%`}}
                         transition={{delay:0.3+i*0.1,duration:0.7,ease:"easeOut"}}
                         className="h-full rounded-full bg-emerald-500"/>
                     </div>
-                    <p className="text-zinc-500 text-xs">{p.menu_fit}</p>
+                    <p className="text-zinc-500 text-xs">{p.reason}</p>
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

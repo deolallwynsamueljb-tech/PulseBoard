@@ -1,13 +1,147 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useLang } from "../context/LangContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Leaf, AlertTriangle, CheckCircle2, RefreshCw, Sparkles, Package,
-  Thermometer, Droplets, Filter, ChevronDown, Clock, TrendingDown
+  Leaf, AlertTriangle, CheckCircle2, RefreshCw, Package,
+  Thermometer, Droplets, Filter, Clock, QrCode, X, Printer,
+  Volume2, VolumeX
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+
+const LANG_LOCALE = {
+  en:"en-IN", ta:"ta-IN", hi:"hi-IN", te:"te-IN",
+  kn:"kn-IN", ml:"ml-IN", bn:"bn-IN", mr:"mr-IN", gu:"gu-IN"
+};
 import API from "../api";
 import toast from "react-hot-toast";
 
 const COLOR = { emerald:"#10b981", amber:"#f59e0b", red:"#ef4444" };
+
+/* ──── Countdown Timer ──── */
+function CountdownTimer({ freshness_days }) {
+  const expiryMs = Date.now() + freshness_days * 86400000;
+  const [left, setLeft] = useState("");
+  useEffect(() => {
+    const tick = () => {
+      const diff = expiryMs - Date.now();
+      if (diff <= 0) { setLeft("Expired"); return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      setLeft(`${d}d ${h}h ${m}m`);
+    };
+    tick();
+    const id = setInterval(tick, 60000);
+    return () => clearInterval(id);
+  }, [expiryMs]);
+  const expDate = new Date(expiryMs).toLocaleDateString("en-IN",
+    { weekday:"short", month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
+  const isUrgent = freshness_days < 2;
+  return (
+    <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ${isUrgent ? "bg-red-500/10 border border-red-500/20" : "bg-surface-700"}`}>
+      <Clock size={11} className={isUrgent ? "text-red-400" : "text-zinc-500"} />
+      <div className="min-w-0">
+        <span className="text-zinc-400">Expires: </span>
+        <span className="text-zinc-200 font-medium">{expDate}</span>
+        <span className={`font-bold ml-2 ${isUrgent ? "text-red-400" : "text-emerald-400"}`}>{left} left</span>
+      </div>
+    </div>
+  );
+}
+
+/* ──── QR Code Modal ──── */
+function QRModal({ herb, freshness_days, stock_kg, zone, onClose, lang="en" }) {
+  const [speaking, setSpeaking] = useState(false);
+  const expDate = new Date(Date.now() + freshness_days * 86400000)
+    .toLocaleDateString("en-IN", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+  const quality = freshness_days >= 4 ? "Premium" : freshness_days >= 2 ? "Good" : "Urgent";
+
+  const speak = () => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel(); setSpeaking(false); return;
+    }
+    const lines = [
+      `${herb} batch from AgriIntel Urban Farm.`,
+      `Freshness: ${freshness_days} days remaining.`,
+      `Stock: ${stock_kg} kilograms in Zone ${zone}.`,
+      `Quality: ${quality}.`,
+      `Expires ${expDate}.`,
+      `Carbon footprint: 0.2 kilograms CO2 per kilogram.`,
+      `Certified fresh. Verify at pulseboard.`
+    ];
+    const utter = new SpeechSynthesisUtterance(lines.join(" "));
+    utter.lang = LANG_LOCALE[lang] || "en-IN";
+    utter.rate = 0.85;
+    utter.onend = () => setSpeaking(false);
+    utter.onerror = () => setSpeaking(false);
+    setSpeaking(true);
+    window.speechSynthesis.speak(utter);
+  };
+  const qrText = [
+    "AGRIINTEL FARM BATCH",
+    `Herb: ${herb}`,
+    `Freshness: ${freshness_days} days remaining`,
+    `Expires: ${expDate}`,
+    `Stock: ${stock_kg} kg | Zone: ${zone}`,
+    `Quality: ${quality}`,
+    `Carbon footprint: 0.2 kg CO2/kg`,
+    `Farm: AgriIntel Urban Farm, Chennai`,
+    `Verify: pulseboard-gamma-cyan.vercel.app`,
+  ].join("\n");
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <motion.div initial={{ scale:0.9, opacity:0 }} animate={{ scale:1, opacity:1 }}
+        className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-zinc-100 font-black text-lg">{herb} Batch QR</h3>
+            <p className="text-zinc-500 text-xs mt-0.5">Chef scans to verify freshness & traceability</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition-all">
+            <X size={14} className="text-zinc-400"/>
+          </button>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl inline-block mb-4 shadow-lg">
+          <QRCodeSVG value={qrText} size={192} bgColor="#ffffff" fgColor="#18181b" level="H"/>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 mb-4 text-xs">
+          {[
+            { label:"Freshness", value:`${freshness_days}d`, color:"text-emerald-400" },
+            { label:"Stock",     value:`${stock_kg} kg`,      color:"text-sky-400"    },
+            { label:"Zone",      value:`Zone ${zone}`,         color:"text-violet-400" },
+          ].map(({label,value,color})=>(
+            <div key={label} className="bg-zinc-800 rounded-xl p-2">
+              <p className="text-zinc-500 text-[10px]">{label}</p>
+              <p className={`font-bold ${color}`}>{value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Voice Button */}
+        <button onClick={speak}
+          className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all mb-2 ${
+            speaking ? "bg-amber-500 hover:bg-amber-400 text-white shadow-lg shadow-amber-500/20" : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+          }`}>
+          {speaking ? <><VolumeX size={14}/> Tap to Stop · Speaking…</> : <><Volume2 size={14}/> Speak Herb Info · {(LANG_LOCALE[lang]||"en-IN").toUpperCase()}</>}
+        </button>
+
+        <div className="flex gap-2">
+          <button onClick={() => window.print()}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold transition-all">
+            <Printer size={14}/> Print Sticker
+          </button>
+          <button onClick={() => { window.speechSynthesis.cancel(); onClose(); }}
+            className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-sm transition-all">
+            Close
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
 
 /* Client-side freshness model: temp/humidity adjusts predicted shelf life */
 function predictAdjusted(baseDays, temp, humidity) {
@@ -18,8 +152,8 @@ function predictAdjusted(baseDays, temp, humidity) {
 }
 
 function FreshnessCard({ herb, freshness_days, best_by, stock_kg, zone, harvested, wilt_alert, quality, color, simTemp, simHumid }) {
-  const [aiData, setAiData] = useState(null);
-  const [aiLoad, setAiLoad] = useState(false);
+  const [showQR,  setShowQR]  = useState(false);
+  const { lang, t } = useLang();
   const c = COLOR[color] || COLOR.emerald;
 
   const adjusted = predictAdjusted(freshness_days, simTemp, simHumid);
@@ -27,16 +161,6 @@ function FreshnessCard({ herb, freshness_days, best_by, stock_kg, zone, harveste
   const isWorse  = adjusted < freshness_days - 0.1;
   const isBetter = adjusted > freshness_days + 0.1;
   const adjColor = isWorse ? "#ef4444" : isBetter ? "#10b981" : c;
-
-  const getAI = async () => {
-    setAiLoad(true);
-    try {
-      const { data } = await API.get(`/freshness/ai/${herb.toLowerCase()}`);
-      setAiData(data);
-      toast.success(`AI analysis ready for ${herb}`);
-    } catch { toast.error("AI analysis failed — showing cached result"); }
-    finally { setAiLoad(false); }
-  };
 
   return (
     <motion.div layout initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
@@ -85,8 +209,11 @@ function FreshnessCard({ herb, freshness_days, best_by, stock_kg, zone, harveste
         </div>
       </div>
 
+      {/* Countdown Timer */}
+      <CountdownTimer freshness_days={adjusted} />
+
       {/* Meta strip */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 my-3">
         {[
           { label:"Stock", value:`${stock_kg} kg` },
           { label:"Best By", value:best_by },
@@ -99,41 +226,20 @@ function FreshnessCard({ herb, freshness_days, best_by, stock_kg, zone, harveste
         ))}
       </div>
 
-      {/* AI Panel */}
-      <AnimatePresence mode="wait">
-        {aiData ? (
-          <motion.div key="ai" initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:"auto" }} exit={{ opacity:0, height:0 }}
-            className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <Sparkles size={11} className="text-emerald-400"/>
-              <p className="text-emerald-400 text-[10px] font-bold uppercase tracking-wide">Gemini Analysis</p>
-              <span className="text-zinc-600 text-[10px] ml-auto">Confidence: {aiData.confidence}</span>
-            </div>
-            <p className="text-zinc-300 text-xs leading-relaxed mb-2">{aiData.storage_tip}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {aiData.wilt_signs?.map((s,i)=>(
-                <span key={i} className="text-[10px] text-zinc-500 bg-surface-700 px-2 py-0.5 rounded-md">{s}</span>
-              ))}
-            </div>
-          </motion.div>
-        ) : (
-          <motion.button key="btn" onClick={getAI} disabled={aiLoad}
-            className="w-full flex items-center justify-center gap-2 text-xs font-medium text-zinc-400 hover:text-emerald-400 border border-surface-600 hover:border-emerald-500/40 hover:bg-emerald-500/5 py-2.5 rounded-xl transition-all disabled:opacity-50 group">
-            <Sparkles size={12} className="group-hover:text-emerald-400 transition-colors"/>
-            {aiLoad ? (
-              <span className="flex items-center gap-2">
-                <span className="w-3 h-3 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin"/>
-                Analyzing with Gemini...
-              </span>
-            ) : "Get AI Freshness Analysis"}
-          </motion.button>
-        )}
-      </AnimatePresence>
+      {/* QR Code button */}
+      <button onClick={() => setShowQR(true)}
+        className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-zinc-300 hover:text-white bg-surface-700 hover:bg-surface-600 border border-surface-600 hover:border-zinc-500 py-2 rounded-xl transition-all mb-3">
+        <QrCode size={13} className="text-emerald-400"/>
+        {t.lbl_qr_btn}
+      </button>
+      {showQR && <QRModal herb={herb} freshness_days={adjusted} stock_kg={stock_kg} zone={zone} onClose={() => setShowQR(false)} lang={lang}/>}
     </motion.div>
   );
 }
 
+
 export default function FreshnessTracker() {
+  const { t } = useLang();
   const [herbs,    setHerbs]    = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [lastUpd,  setLastUpd]  = useState(null);
@@ -177,24 +283,24 @@ export default function FreshnessTracker() {
       <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-black text-zinc-100 tracking-tight flex items-center gap-2">
-            <Leaf size={20} className="text-emerald-400"/> Freshness Tracker
+            <Leaf size={20} className="text-emerald-400"/> {t.pg_fresh_title}
           </h1>
-          <p className="text-zinc-500 text-sm mt-0.5">AI-powered shelf-life prediction · live batch monitoring</p>
+          <p className="text-zinc-500 text-sm mt-0.5">{t.pg_fresh_sub}</p>
         </div>
         <button onClick={() => refresh()} disabled={loading}
           className="flex items-center gap-2 text-xs text-zinc-400 hover:text-zinc-100 bg-surface-800 border border-surface-600 hover:border-surface-500 px-3 py-1.5 rounded-xl transition-all disabled:opacity-40">
           <RefreshCw size={12} className={loading ? "animate-spin" : ""}/>
-          {lastUpd || "Refresh"}
+          {lastUpd || t.lbl_refresh}
         </button>
       </motion.div>
 
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label:"Avg Freshness",  value:`${avgDays}d`,  sub:"Across all herbs",      color:"#10b981", icon:CheckCircle2   },
-          { label:"Active Batches", value:herbs.length,  sub:"Currently tracked",      color:"#38bdf8", icon:Package        },
-          { label:"Wilt Alerts",    value:wiltCount,     sub:"Urgent attention needed", color:wiltCount?"#ef4444":"#71717a", icon:AlertTriangle },
-          { label:"Simulator",      value:simOn ? "ON":"OFF", sub:`${displayTemp}°C · ${displayHumid}% RH`, color:simOn?"#f59e0b":"#52525b", icon:Thermometer },
+          { label:t.lbl_avg_freshness,  value:`${avgDays}d`,  sub:"Across all herbs",      color:"#10b981", icon:CheckCircle2   },
+          { label:t.lbl_active_batches, value:herbs.length,  sub:"Currently tracked",      color:"#38bdf8", icon:Package        },
+          { label:t.lbl_wilt_alerts,    value:wiltCount,     sub:"Urgent attention needed", color:wiltCount?"#ef4444":"#71717a", icon:AlertTriangle },
+          { label:t.lbl_climate_sim,    value:simOn ? "ON":"OFF", sub:`${displayTemp}°C · ${displayHumid}% RH`, color:simOn?"#f59e0b":"#52525b", icon:Thermometer },
         ].map(({label,value,sub,color,icon:Icon})=>(
           <motion.div key={label} initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
             className="bg-surface-800 border border-surface-600 rounded-2xl p-4 flex items-center gap-3">
@@ -216,7 +322,7 @@ export default function FreshnessTracker() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Thermometer size={14} className={simOn ? "text-amber-400" : "text-zinc-500"}/>
-            <h2 className="text-sm font-bold text-zinc-200">Climate Simulator</h2>
+            <h2 className="text-sm font-bold text-zinc-200">{t.lbl_climate_sim}</h2>
             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${simOn ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-surface-700 text-zinc-500"}`}>
               {simOn ? "ACTIVE — predictions adjusted" : "OFF"}
             </span>

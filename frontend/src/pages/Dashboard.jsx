@@ -7,10 +7,12 @@ import {
 import {
   Leaf, Droplets, Zap, Clock, RefreshCw, Sparkles, ArrowRight,
   TrendingUp, TrendingDown, Thermometer, Wind, Sun, Layers,
-  ArrowUpRight, AlertTriangle, CheckCircle2, Activity
+  AlertTriangle, CheckCircle2, Activity, MapPin,
+  Package, Truck, ChefHat
 } from "lucide-react";
 import API from "../api";
 import toast from "react-hot-toast";
+import { useLang } from "../context/LangContext";
 
 const TT = {
   contentStyle:{ background:"#18181b",border:"1px solid #3f3f46",borderRadius:"8px",color:"#e4e4e7",fontSize:"12px" },
@@ -75,11 +77,11 @@ function SensorTile({ label, value, unit, status, icon: Icon, color }) {
 const SENSOR_NOISE = { temperature:0.25, humidity:0.8, co2:4, light:12, ph:0.03 };
 
 export default function Dashboard() {
+  const { t } = useLang();
   const [kpis,       setKpis]       = useState(null);
   const [revenue,    setRevenue]    = useState([]);
   const [sensors,    setSensors]    = useState(null);
   const [liveOffset, setLiveOffset] = useState({});
-  const [insight,    setInsight]    = useState(null);
   const [health,     setHealth]     = useState(null);
   const [alerts,     setAlerts]     = useState(null);
   const [lastUpd,    setLastUpd]    = useState(null);
@@ -88,18 +90,16 @@ export default function Dashboard() {
   const refresh = useCallback(async (silent=false) => {
     if (!silent) setLoading(true);
     try {
-      const [k, r, s, ins, h, al] = await Promise.all([
+      const [k, r, s, h, al] = await Promise.all([
         API.get("/kpis/"),
         API.get("/analytics/revenue"),
         API.get("/sensors/"),
-        API.get("/ai/insights"),
         API.get("/ai/health-score"),
-        API.get("/ai/demand-alerts"),
+        API.post("/ai/demand-alerts", { live_data: {} }),
       ]);
       setKpis(k.data);
       setRevenue(r.data);
       setSensors(s.data);
-      setInsight(ins.data.insights?.[0] || null);
       setHealth(h.data);
       setAlerts(al.data?.alerts?.filter(a=>a.urgency==="Critical"||a.urgency==="High").slice(0,2) || []);
       setLastUpd(new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}));
@@ -107,18 +107,48 @@ export default function Dashboard() {
     finally { if (!silent) setLoading(false); }
   }, []);
 
-  /* 3-second client-side sensor micro-jitter — no API call */
+  /* Real-time sensors: WebSocket when backend is live, client-side jitter as fallback */
   useEffect(() => {
-    const tick = setInterval(() => {
-      setLiveOffset({
-        temperature: +(( Math.random() - 0.5) * 2 * SENSOR_NOISE.temperature).toFixed(2),
-        humidity:    +(( Math.random() - 0.5) * 2 * SENSOR_NOISE.humidity).toFixed(1),
-        co2:         Math.round((Math.random() - 0.5) * 2 * SENSOR_NOISE.co2),
-        light:       Math.round((Math.random() - 0.5) * 2 * SENSOR_NOISE.light),
-        ph:          +(( Math.random() - 0.5) * 2 * SENSOR_NOISE.ph).toFixed(2),
-      });
-    }, 3000);
-    return () => clearInterval(tick);
+    const WS_BASE = (import.meta.env.VITE_API_URL || "http://localhost:8001")
+      .replace(/^http/, "ws");
+    let ws = null;
+    let jitter = null;
+    let wsLive = false;
+
+    const startJitter = () => {
+      jitter = setInterval(() => {
+        setLiveOffset({
+          temperature: +(( Math.random() - 0.5) * 2 * SENSOR_NOISE.temperature).toFixed(2),
+          humidity:    +(( Math.random() - 0.5) * 2 * SENSOR_NOISE.humidity).toFixed(1),
+          co2:         Math.round((Math.random() - 0.5) * 2 * SENSOR_NOISE.co2),
+          light:       Math.round((Math.random() - 0.5) * 2 * SENSOR_NOISE.light),
+          ph:          +(( Math.random() - 0.5) * 2 * SENSOR_NOISE.ph).toFixed(2),
+        });
+      }, 3000);
+    };
+
+    try {
+      ws = new WebSocket(`${WS_BASE}/ws/sensors`);
+      ws.onopen  = () => { wsLive = true; };
+      ws.onmessage = (e) => {
+        const d = JSON.parse(e.data);
+        setSensors(prev => {
+          if (!prev) return prev;
+          const next = { ...prev };
+          Object.keys(d).forEach(k => { if (next[k]) next[k] = { ...next[k], value: d[k] }; });
+          return next;
+        });
+      };
+      ws.onerror = () => { wsLive = false; startJitter(); };
+      ws.onclose = () => { if (!wsLive) startJitter(); };
+    } catch { startJitter(); }
+
+    setTimeout(() => { if (!wsLive) startJitter(); }, 2000);
+
+    return () => {
+      if (ws) ws.close();
+      if (jitter) clearInterval(jitter);
+    };
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -135,8 +165,8 @@ export default function Dashboard() {
       {/* Header */}
       <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-zinc-100 tracking-tight">Farm Dashboard</h1>
-          <p className="text-zinc-500 text-sm mt-0.5">AgriIntel · Real-time farm intelligence</p>
+          <h1 className="text-2xl font-black text-zinc-100 tracking-tight">{t.pg_dash_title}</h1>
+          <p className="text-zinc-500 text-sm mt-0.5">{t.pg_dash_sub}</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
@@ -158,7 +188,7 @@ export default function Dashboard() {
           <div className="flex items-start gap-3">
             <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5"/>
             <div className="flex-1">
-              <p className="text-amber-300 text-xs font-bold uppercase tracking-wide mb-2">Demand Alerts</p>
+              <p className="text-amber-300 text-xs font-bold uppercase tracking-wide mb-2">{t.lbl_active_alerts}</p>
               <div className="flex flex-wrap gap-3">
                 {alerts.map((a,i) => (
                   <div key={i} className="flex items-center gap-2 bg-surface-800 border border-surface-600 rounded-xl px-3 py-2">
@@ -241,7 +271,7 @@ export default function Dashboard() {
           className="bg-surface-800 border border-surface-600 rounded-2xl p-6 flex flex-col">
           <div className="flex items-center gap-2 mb-5">
             <Sparkles size={14} className="text-emerald-400"/>
-            <h2 className="text-sm font-bold text-zinc-200">Farm Health Score</h2>
+            <h2 className="text-sm font-bold text-zinc-200">{t.lbl_farm_health}</h2>
           </div>
           {health ? (
             <>
@@ -293,7 +323,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <Thermometer size={14} className="text-zinc-400"/>
-            <h2 className="text-sm font-bold text-zinc-200">Live Environmental Sensors</h2>
+            <h2 className="text-sm font-bold text-zinc-200">{t.lbl_live_sensors}</h2>
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/>
@@ -322,55 +352,80 @@ export default function Dashboard() {
         )}
       </motion.div>
 
-      {/* AI Insight + Quick links */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {insight && (
-          <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.5 }}
-            className="xl:col-span-2 bg-gradient-to-br from-emerald-500/10 to-surface-800 border border-emerald-500/20 rounded-2xl p-5">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center flex-shrink-0">
-                <Sparkles size={15} className="text-emerald-400"/>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <p className="text-emerald-300 text-xs font-bold">AI INSIGHT · {insight.impact} IMPACT</p>
-                  <span className="text-[10px] text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Gemini</span>
-                </div>
-                <p className="text-zinc-200 text-sm leading-relaxed">{insight.description}</p>
-                {insight.action && <p className="text-zinc-500 text-xs mt-2">→ <span className="text-zinc-300">{insight.action}</span></p>}
-              </div>
-              <Link to="/advisor" className="flex items-center gap-1 text-emerald-400 text-xs font-semibold whitespace-nowrap hover:text-emerald-300 transition-colors bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl">
-                Ask AI <ArrowRight size={11}/>
-              </Link>
+      {/* Live Deliveries */}
+      <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.5 }}
+        className="bg-surface-800 border border-surface-600 rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Truck size={14} className="text-violet-400"/>
+              <h2 className="text-sm font-bold text-zinc-200">Live Delivery Tracker</h2>
             </div>
-          </motion.div>
-        )}
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20">3 active</span>
+          </div>
 
-        <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.55 }}
-          className="bg-surface-800 border border-surface-600 rounded-2xl p-5">
-          <p className="text-xs font-bold text-zinc-400 uppercase tracking-wide mb-4">Quick Access</p>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {[
-              { to:"/freshness", label:"Freshness Tracker", sub:"Check herb expiry",    color:"text-emerald-400", bg:"bg-emerald-500/10" },
-              { to:"/market",    label:"Herb Stock Market", sub:"Live price tickers",   color:"text-brand-400",   bg:"bg-brand-500/10"   },
-              { to:"/waste",     label:"Waste Predictor",   sub:"Flash sale alerts",    color:"text-amber-400",   bg:"bg-amber-500/10"   },
-              { to:"/advisor",   label:"AI Advisor",        sub:"Ask anything",         color:"text-violet-400",  bg:"bg-violet-500/10"  },
-            ].map(({to,label,sub,color,bg})=>(
-              <Link key={to} to={to}
-                className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-700 transition-colors group">
-                <div className={`w-7 h-7 ${bg} rounded-lg flex items-center justify-center`}>
-                  <ArrowUpRight size={12} className={color}/>
+              {
+                id:"DEL-2847", chef:"Arj Mehta · Taj Hotels", herbs:"Basil 3kg, Rosemary 1.5kg",
+                steps:["Harvested","Packed","Picked Up","En Route","Delivered"],
+                current:3, eta:"14 min", dist:"2.1 km",
+                color:"violet"
+              },
+              {
+                id:"DEL-2848", chef:"Priya Sharma · Cloud Kitchen", herbs:"Mint 2kg, Coriander 1kg",
+                steps:["Harvested","Packed","Picked Up","En Route","Delivered"],
+                current:2, eta:"31 min", dist:"4.8 km",
+                color:"sky"
+              },
+              {
+                id:"DEL-2849", chef:"Ravi Kumar · Hotel Leela", herbs:"Thyme 2kg, Chives 0.5kg",
+                steps:["Harvested","Packed","Picked Up","En Route","Delivered"],
+                current:1, eta:"52 min", dist:"7.3 km",
+                color:"emerald"
+              },
+            ].map(({ id, chef, herbs, steps, current, eta, dist, color }) => (
+              <div key={id} className="bg-surface-700/50 border border-surface-600 rounded-2xl p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <ChefHat size={11} className={`text-${color}-400`}/>
+                      <p className="text-zinc-200 text-xs font-semibold">{chef}</p>
+                      <span className="text-zinc-700 text-[10px]">#{id}</span>
+                    </div>
+                    <p className="text-zinc-500 text-[11px] flex items-center gap-1">
+                      <Package size={9}/> {herbs}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className={`text-${color}-400 font-black text-sm`}>ETA {eta}</p>
+                    <p className="text-zinc-600 text-[10px] flex items-center gap-1 justify-end">
+                      <MapPin size={9}/> {dist}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-zinc-200 text-xs font-semibold">{label}</p>
-                  <p className="text-zinc-500 text-[11px]">{sub}</p>
+                {/* Steps progress */}
+                <div className="flex items-center gap-0">
+                  {steps.map((step, i) => (
+                    <div key={step} className="flex items-center flex-1 last:flex-none">
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black flex-shrink-0 border ${
+                        i < current  ? `bg-${color}-500 border-${color}-400 text-white` :
+                        i === current ? `bg-${color}-500/20 border-${color}-400 text-${color}-400 animate-pulse` :
+                                       `bg-surface-600 border-surface-500 text-zinc-600`
+                      }`}>
+                        {i < current ? "✓" : i + 1}
+                      </div>
+                      {i < steps.length - 1 && (
+                        <div className={`flex-1 h-0.5 mx-0.5 ${i < current ? `bg-${color}-500` : "bg-surface-600"}`}/>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <ArrowRight size={11} className="text-zinc-600 group-hover:text-zinc-400 ml-auto transition-colors"/>
-              </Link>
+                <p className={`text-[10px] font-semibold mt-1.5 text-${color}-400`}>{steps[current]}</p>
+              </div>
             ))}
           </div>
-        </motion.div>
-      </div>
+      </motion.div>
+
     </div>
   );
 }
