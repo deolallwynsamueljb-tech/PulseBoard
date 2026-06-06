@@ -3,7 +3,7 @@ import { FALLBACK } from "./lib/fallback";
 
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "",
-  timeout: 8000,
+  timeout: 30000,
 });
 
 API.interceptors.request.use((config) => {
