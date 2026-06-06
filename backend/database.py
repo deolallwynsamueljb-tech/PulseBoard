@@ -14,7 +14,7 @@ else:
     MONGODB_URL = settings.MONGODB_URL
 
 try:
-    client = AsyncIOMotorClient(MONGODB_URL) if MONGODB_URL else None
+    client = AsyncIOMotorClient(MONGODB_URL, serverSelectionTimeoutMS=8000) if MONGODB_URL else None
     db     = client[DB_NAME] if client else None
 except Exception as e:
     print(f"MongoDB client init error: {e}")

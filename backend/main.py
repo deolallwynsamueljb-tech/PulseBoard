@@ -9,7 +9,7 @@ from database import check_connection, client
 async def lifespan(app: FastAPI):
     await check_connection()
     yield
-    if client:
+    if client is not None:
         client.close()
 
 app = FastAPI(title="AgriIntel API", version="2.0.0", lifespan=lifespan)
@@ -32,11 +32,11 @@ async def health():
     from config import settings
     from database import db
     mongo_ok = False
-    if db:
+    if db is not None:
         try:
             await db.command("ping")
             mongo_ok = True
-        except:
+        except Exception:
             pass
     return {
         "status": "ok",
