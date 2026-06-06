@@ -1,2 +1,4 @@
+backend/ml/*.pkl
+backend/venv
 frontend/node_modules
 frontend/.vercel

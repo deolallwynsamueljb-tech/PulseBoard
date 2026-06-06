@@ -202,12 +202,13 @@ export default function AIAdvisor() {
         message: q,
         history: messages.slice(-6).map(m => ({ role:m.role, content:m.text })),
         live_data,
-      }, { timeout: 58000 });
+      }, { timeout: 55000 });
       const data = res.data;
-      // Detect fallback (backend offline)
+      // Auto-retry once if server is still warming up
       if (res._fallback || data.model === "offline") {
-        setBackendStatus("offline");
-        setMessages(p => [...p, { role:"ai", text:"The AI server is starting up — this can take a few seconds on first load. Please tap Retry or ask your question again." }]);
+        setMessages(p => [...p, { role:"ai", text:"⏳ AI warming up — retrying in 5 seconds automatically..." }]);
+        setLoading(false);
+        setTimeout(() => ask(q), 5000);
         return;
       }
       const reply = data.reply && data.reply.trim() && data.reply.trim() !== "{}"
