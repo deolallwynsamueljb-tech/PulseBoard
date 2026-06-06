@@ -35,7 +35,7 @@ async def health():
     mongo_ok = False
     if db is not None:
         try:
-            await asyncio.wait_for(db.command("ping"), timeout=2.0)
+            await asyncio.wait_for(db.command("ping"), timeout=10.0)
             mongo_ok = True
         except Exception:
             pass
