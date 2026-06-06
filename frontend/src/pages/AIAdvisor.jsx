@@ -137,7 +137,7 @@ export default function AIAdvisor() {
   const checkHealth = useCallback(async () => {
     setBackendStatus("checking");
     try {
-      const { data } = await API.get("/health", { timeout: 5000 });
+      const { data } = await API.get("/health", { timeout: 12000 });
       if (data.status === "offline") {
         setBackendStatus("offline");
         setAiKeys({ groq: false, mistral: false });
@@ -209,7 +209,7 @@ export default function AIAdvisor() {
       // Detect fallback (backend offline)
       if (res._fallback || data.model === "offline") {
         setBackendStatus("offline");
-        setMessages(p => [...p, { role:"ai", text:"I can't reach the backend server. Please start it with: uvicorn main:app --port 8001 (from the backend directory), then retry." }]);
+        setMessages(p => [...p, { role:"ai", text:"The AI server is starting up — this can take a few seconds on first load. Please tap Retry or ask your question again." }]);
         return;
       }
       const reply = data.reply && data.reply.trim() && data.reply.trim() !== "{}"
@@ -220,7 +220,7 @@ export default function AIAdvisor() {
       const isTimeout = err?.code === "ECONNABORTED" || err?.message?.includes("timeout");
       const msg = isTimeout
         ? "AI is taking longer than usual — please try again. (Tip: ask shorter questions for faster responses.)"
-        : "AI is temporarily unavailable. Check that the backend server is running on port 8001.";
+        : "AI is temporarily unavailable — the server may be starting up. Please try again in a moment.";
       setMessages(p => [...p, { role:"ai", text:msg }]);
       checkHealth();
     } finally {
@@ -274,7 +274,7 @@ export default function AIAdvisor() {
             <div className="flex items-center gap-2">
               <WifiOff size={14} className="text-red-400 flex-shrink-0"/>
               <p className="text-red-300 text-xs">
-                <span className="font-bold">Backend offline.</span> Start the backend: <code className="bg-red-500/10 px-1.5 py-0.5 rounded text-red-200">cd backend && uvicorn main:app --port 8001</code>
+                <span className="font-bold">AI server warming up.</span> This takes a few seconds on first load — tap <span className="font-semibold text-red-200">Retry</span> in a moment.
               </p>
             </div>
             <button onClick={checkHealth} className="text-[10px] text-red-400 hover:text-red-200 border border-red-500/20 px-2 py-1 rounded-lg flex-shrink-0">
