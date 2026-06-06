@@ -1,3 +1,2 @@
-backend/ml/*.pkl
 frontend/node_modules
 frontend/.vercel
