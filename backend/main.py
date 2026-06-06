@@ -7,7 +7,8 @@ from database import check_connection, client
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await check_connection()
+    # DB check runs in background — never block startup waiting for MongoDB
+    asyncio.create_task(check_connection())
     yield
     if client is not None:
         client.close()
@@ -34,7 +35,7 @@ async def health():
     mongo_ok = False
     if db is not None:
         try:
-            await db.command("ping")
+            await asyncio.wait_for(db.command("ping"), timeout=2.0)
             mongo_ok = True
         except Exception:
             pass

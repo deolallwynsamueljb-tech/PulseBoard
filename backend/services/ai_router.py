@@ -36,7 +36,7 @@ class RateLimitError(Exception):
 
 async def _call_openai_compat(url: str, api_key: str, model: str, prompt: str, max_tokens: int = 1400) -> str:
     """Shared OpenAI-compatible POST — Groq and Mistral."""
-    async with httpx.AsyncClient(timeout=25) as client:
+    async with httpx.AsyncClient(timeout=20) as client:
         res = await client.post(
             url,
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
