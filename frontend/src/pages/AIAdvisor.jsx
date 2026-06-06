@@ -202,7 +202,7 @@ export default function AIAdvisor() {
         message: q,
         history: messages.slice(-6).map(m => ({ role:m.role, content:m.text })),
         live_data,
-      }, { timeout: 40000 });
+      }, { timeout: 58000 });
       const data = res.data;
       // Detect fallback (backend offline)
       if (res._fallback || data.model === "offline") {
