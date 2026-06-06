@@ -19,6 +19,7 @@ API.interceptors.request.use((config) => {
 
 /* Map endpoint paths to fallback keys so pages always have data */
 const FALLBACK_MAP = {
+  "/health":              { status: "offline", service: "Backend unavailable", ai: { groq: false, mistral: false } },
   "/kpis/":               FALLBACK.kpis,
   "/kpis":                FALLBACK.kpis,
   "/analytics/revenue":   FALLBACK.revenue,

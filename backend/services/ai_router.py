@@ -3,6 +3,8 @@ AI routing — Groq Llama 70B (analysis) + Groq Llama 8B (fast) + Mistral (chat)
 Full fallback chain: SMART → FAST → "{}"
 """
 
+import hashlib
+import time
 import httpx
 import json
 import re
@@ -11,13 +13,21 @@ from config import settings
 
 log = logging.getLogger("ai_router")
 
+# In-memory response cache — prevents repeated API calls for the same prompt
+# chat is excluded (unique every time); all other tasks cached for 6 minutes
+_cache: dict[str, tuple[float, str]] = {}
+_CACHE_TTL = 360   # seconds
+_NO_CACHE  = {"chat"}  # never cache conversational responses
+
 GROQ_URL    = "https://api.groq.com/openai/v1/chat/completions"
 MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
+GOOGLE_URL  = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 
 MISTRAL_SMALL  = "mistral-small-latest"
 GROQ_FAST      = "llama-3.1-8b-instant"
 GROQ_SMART     = "llama-3.3-70b-versatile"
 GROQ_VISION    = "meta-llama/llama-4-scout-17b-16e-instruct"
+GEMINI_FLASH   = "gemini-2.0-flash"
 
 
 class RateLimitError(Exception):
@@ -86,6 +96,20 @@ async def ask_mistral(prompt: str, model: str = MISTRAL_SMALL) -> str:
         return await ask_groq(prompt, GROQ_FAST)
 
 
+async def ask_gemini(prompt: str, model: str = GEMINI_FLASH) -> str:
+    """Google AI Studio (Gemini) — primary for chat/analysis. Chain: Gemini→Mistral→Groq."""
+    if not settings.GOOGLE_API_KEY:
+        return await ask_mistral(prompt, MISTRAL_SMALL)
+    try:
+        return await _call_openai_compat(GOOGLE_URL, settings.GOOGLE_API_KEY, model, prompt, max_tokens=1400)
+    except RateLimitError:
+        log.warning("Gemini rate limited, trying Mistral…")
+        return await ask_mistral(prompt, MISTRAL_SMALL)
+    except Exception as e:
+        log.warning(f"Gemini error ({e}), trying Mistral…")
+        return await ask_mistral(prompt, MISTRAL_SMALL)
+
+
 def extract_json(text: str, fallback: dict) -> dict:
     if not text or text.strip() in ("{}", ""):
         return fallback
@@ -109,23 +133,37 @@ def extract_json(text: str, fallback: dict) -> dict:
 
 
 TASK_MODEL_MAP = {
-    "chat":       (ask_groq, GROQ_SMART),
+    # Mistral primary (confirmed working) → Groq fallback inside ask_mistral
+    "chat":       (ask_mistral, MISTRAL_SMALL),
+    "insights":   (ask_mistral, MISTRAL_SMALL),
+    "health":     (ask_mistral, MISTRAL_SMALL),
+    "demand":     (ask_mistral, MISTRAL_SMALL),
+    "forecast":   (ask_mistral, MISTRAL_SMALL),
+    "strategy":   (ask_mistral, MISTRAL_SMALL),
     "sentiment":  (ask_mistral, MISTRAL_SMALL),
     "anomaly":    (ask_mistral, MISTRAL_SMALL),
     "sensor":     (ask_mistral, MISTRAL_SMALL),
-    "complaints": (ask_groq, GROQ_FAST),
-    "summary":    (ask_groq, GROQ_FAST),
-    "insights":   (ask_groq, GROQ_SMART),
-    "health":     (ask_groq, GROQ_SMART),
-    "price":      (ask_groq, GROQ_SMART),
-    "demand":     (ask_groq, GROQ_SMART),
-    "forecast":   (ask_groq, GROQ_SMART),
-    "harvest":    (ask_groq, GROQ_SMART),
-    "strategy":   (ask_groq, GROQ_SMART),
+    "complaints": (ask_mistral, MISTRAL_SMALL),
+    "summary":    (ask_mistral, MISTRAL_SMALL),
+    # Groq for speed-sensitive tasks
+    "price":      (ask_groq,    GROQ_SMART),
+    "harvest":    (ask_groq,    GROQ_SMART),
 }
 
 
 async def ai(task: str, prompt: str) -> str:
+    if task not in _NO_CACHE:
+        key = hashlib.md5(f"{task}:{prompt[:300]}".encode()).hexdigest()
+        now = time.time()
+        cached = _cache.get(key)
+        if cached and (now - cached[0]) < _CACHE_TTL:
+            log.info(f"Cache hit ({task})")
+            return cached[1]
+        fn, model = TASK_MODEL_MAP.get(task, (ask_groq, GROQ_SMART))
+        result = await fn(prompt, model)
+        if result and result.strip() not in ("{}", ""):
+            _cache[key] = (now, result)
+        return result
     fn, model = TASK_MODEL_MAP.get(task, (ask_groq, GROQ_SMART))
     return await fn(prompt, model)
 

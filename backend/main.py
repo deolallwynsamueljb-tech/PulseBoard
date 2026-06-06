@@ -25,7 +25,16 @@ for router in [auth.router, kpis.router, analytics.router, feedback.router,
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "AgriIntel API v2.0.0"}
+    from config import settings
+    return {
+        "status": "ok",
+        "service": "AgriIntel API v2.0.0",
+        "ai": {
+            "groq":    bool(settings.GROQ_API_KEY),
+            "mistral": bool(settings.MISTRAL_API_KEY),
+            "gemini":  bool(settings.GOOGLE_API_KEY),
+        },
+    }
 
 @app.websocket("/ws/sensors")
 async def ws_sensors(websocket: WebSocket):

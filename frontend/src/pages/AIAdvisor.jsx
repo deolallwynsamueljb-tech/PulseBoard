@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useLang } from "../context/LangContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Send, BrainCircuit, Sparkles, TrendingUp, AlertTriangle, Leaf,
   RefreshCw, ChevronRight, Zap, Copy, Check, Thermometer, Droplets,
-  Package, Activity
+  Package, Activity, Wifi, WifiOff
 } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../api";
@@ -129,35 +129,68 @@ export default function AIAdvisor() {
   const [liveSensors, setLiveSensors] = useState(null);
   const [liveKpis,    setLiveKpis]    = useState(null);
   const [contextTab,  setContextTab]  = useState("prices");
+  const [backendStatus, setBackendStatus] = useState("checking"); // "checking" | "online" | "offline"
+  const [aiKeys,        setAiKeys]        = useState({ groq: false, mistral: false, gemini: false });
   const endRef   = useRef(null);
   const inputRef = useRef(null);
 
-  const loadPanels = async () => {
-    setRecsLoad(true);
+  const checkHealth = useCallback(async () => {
+    setBackendStatus("checking");
     try {
-      const [r, d, s, m, f, w, sens, k] = await Promise.all([
-        API.get("/ai/recommendations"),
-        API.post("/ai/demand-alerts", { live_data: {} }),
-        API.get("/ai/seasonal"),
+      const { data } = await API.get("/health", { timeout: 5000 });
+      if (data.status === "offline") {
+        setBackendStatus("offline");
+        setAiKeys({ groq: false, mistral: false });
+      } else {
+        setBackendStatus("online");
+        setAiKeys(data.ai || { groq: false, mistral: false });
+      }
+    } catch {
+      setBackendStatus("offline");
+      setAiKeys({ groq: false, mistral: false });
+    }
+  }, []);
+
+  /* Load live context data (no AI calls) */
+  const loadLiveData = useCallback(async () => {
+    try {
+      const [m, f, w, sens, k] = await Promise.all([
         API.get("/market/"),
         API.get("/freshness/"),
         API.get("/waste/"),
         API.get("/sensors/"),
         API.get("/kpis/"),
       ]);
-      setRecs(r.data.recommendations || []);
-      setDemand(d.data);
-      setSeasonal(s.data);
       setLiveMarket(m.data?.tickers || []);
       setLiveFresh(f.data || []);
       setLiveWaste(w.data?.alerts || []);
       setLiveSensors(sens.data);
       setLiveKpis(k.data);
     } catch {}
-    finally { setRecsLoad(false); }
-  };
+  }, []);
 
-  useEffect(() => { loadPanels(); }, []);
+  /* Load AI panels one at a time with a gap to avoid Groq rate limiting */
+  const loadAITab = useCallback(async (tab) => {
+    setRecsLoad(true);
+    try {
+      if (tab === "recs" && recs.length === 0) {
+        const r = await API.get("/ai/recommendations");
+        setRecs(r.data.recommendations || []);
+      } else if (tab === "demand" && !demand) {
+        const d = await API.post("/ai/demand-alerts", { live_data: {} });
+        setDemand(d.data);
+      } else if (tab === "seasonal" && !seasonal) {
+        const s = await API.get("/ai/seasonal");
+        setSeasonal(s.data);
+      }
+    } catch {}
+    finally { setRecsLoad(false); }
+  }, [recs.length, demand, seasonal]);
+
+  useEffect(() => { checkHealth(); loadLiveData(); }, [checkHealth, loadLiveData]);
+
+  /* Load AI panel content when tab is first selected */
+  useEffect(() => { loadAITab(activeTab); }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, loading]);
 
   const ask = async (q = input.trim()) => {
@@ -167,12 +200,19 @@ export default function AIAdvisor() {
     setLoading(true);
     try {
       const live_data = buildLiveData(liveMarket, liveFresh, liveWaste, liveSensors, liveKpis, demand);
-      const { data } = await API.post("/ai/chat", {
+      const res = await API.post("/ai/chat", {
         message: q,
         history: messages.slice(-6).map(m => ({ role:m.role, content:m.text })),
         live_data,
       }, { timeout: 40000 });
-      const reply = data.reply && data.reply.trim() && data.reply.trim() !== "{}" && data.reply.trim() !== "{}"
+      const data = res.data;
+      // Detect fallback (backend offline)
+      if (res._fallback || data.model === "offline") {
+        setBackendStatus("offline");
+        setMessages(p => [...p, { role:"ai", text:"I can't reach the backend server. Please start it with: uvicorn main:app --port 8001 (from the backend directory), then retry." }]);
+        return;
+      }
+      const reply = data.reply && data.reply.trim() && data.reply.trim() !== "{}"
         ? data.reply
         : "The AI is temporarily unavailable — please try again in a moment. (Backend may be rate-limited.)";
       setMessages(p => [...p, { role:"ai", text:reply }]);
@@ -182,6 +222,7 @@ export default function AIAdvisor() {
         ? "AI is taking longer than usual — please try again. (Tip: ask shorter questions for faster responses.)"
         : "AI is temporarily unavailable. Check that the backend server is running on port 8001.";
       setMessages(p => [...p, { role:"ai", text:msg }]);
+      checkHealth();
     } finally {
       setLoading(false);
       inputRef.current?.focus();
@@ -204,11 +245,53 @@ export default function AIAdvisor() {
           </h1>
           <p className="text-zinc-500 text-sm mt-0.5">{t.pg_advisor_sub}</p>
         </div>
-        <button onClick={clearChat}
-          className="text-xs text-zinc-500 hover:text-zinc-300 border border-surface-600 hover:border-surface-500 bg-surface-800 px-3 py-1.5 rounded-xl transition-all">
-          {t.lbl_clear_chat}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Backend health badge */}
+          <button onClick={checkHealth} title="Check backend connection"
+            className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-xl border transition-all ${
+              backendStatus === "online"   ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400" :
+              backendStatus === "offline"  ? "bg-red-500/10 border-red-500/25 text-red-400" :
+                                            "bg-zinc-800 border-surface-600 text-zinc-500"
+            }`}>
+            {backendStatus === "online"  ? <Wifi size={11}/> :
+             backendStatus === "offline" ? <WifiOff size={11}/> :
+             <span className="w-2 h-2 rounded-full bg-zinc-500 animate-pulse inline-block"/>}
+            {backendStatus === "online"  ? `API ${[aiKeys.gemini?"Gemini":null, aiKeys.mistral?"Mistral":null, aiKeys.groq?"Groq":null].filter(Boolean).join(" + ") || "no keys"}` :
+             backendStatus === "offline" ? "Backend offline" : "Checking…"}
+          </button>
+          <button onClick={clearChat}
+            className="text-xs text-zinc-500 hover:text-zinc-300 border border-surface-600 hover:border-surface-500 bg-surface-800 px-3 py-1.5 rounded-xl transition-all">
+            {t.lbl_clear_chat}
+          </button>
+        </div>
       </motion.div>
+
+      {/* Backend offline banner */}
+      <AnimatePresence>
+        {backendStatus === "offline" && (
+          <motion.div initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }}
+            className="bg-red-500/10 border border-red-500/25 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <WifiOff size={14} className="text-red-400 flex-shrink-0"/>
+              <p className="text-red-300 text-xs">
+                <span className="font-bold">Backend offline.</span> Start the backend: <code className="bg-red-500/10 px-1.5 py-0.5 rounded text-red-200">cd backend && uvicorn main:app --port 8001</code>
+              </p>
+            </div>
+            <button onClick={checkHealth} className="text-[10px] text-red-400 hover:text-red-200 border border-red-500/20 px-2 py-1 rounded-lg flex-shrink-0">
+              Retry
+            </button>
+          </motion.div>
+        )}
+        {backendStatus === "online" && (!aiKeys.groq && !aiKeys.mistral && !aiKeys.gemini) && (
+          <motion.div initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }}
+            className="bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-3 flex items-center gap-2">
+            <AlertTriangle size={14} className="text-amber-400 flex-shrink-0"/>
+            <p className="text-amber-300 text-xs">
+              <span className="font-bold">No AI keys configured.</span> Add <code className="bg-amber-500/10 px-1 rounded">GROQ_API_KEY</code> and <code className="bg-amber-500/10 px-1 rounded">MISTRAL_API_KEY</code> to <code className="bg-amber-500/10 px-1 rounded">backend/.env</code> to enable the AI advisor.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
         {/* Chat Panel */}
@@ -270,7 +353,7 @@ export default function AIAdvisor() {
                 <p className="text-violet-300 text-xs font-bold uppercase tracking-wide">Live Context</p>
                 {hasLive && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">LIVE</span>}
               </div>
-              <button onClick={loadPanels} disabled={recsLoad} className="text-[10px] text-zinc-600 hover:text-zinc-400 flex items-center gap-1 transition-colors">
+              <button onClick={() => { loadLiveData(); loadAITab(activeTab); }} disabled={recsLoad} className="text-[10px] text-zinc-600 hover:text-zinc-400 flex items-center gap-1 transition-colors">
                 <RefreshCw size={9} className={recsLoad?"animate-spin":""}/>Refresh
               </button>
             </div>
@@ -410,7 +493,7 @@ export default function AIAdvisor() {
               <>
                 <div className="flex items-center justify-between px-1">
                   <p className="text-xs text-zinc-500">{recs.length} prioritised actions</p>
-                  <button onClick={loadPanels} disabled={recsLoad}
+                  <button onClick={() => { loadLiveData(); loadAITab(activeTab); }} disabled={recsLoad}
                     className="text-xs text-zinc-500 hover:text-emerald-400 flex items-center gap-1 transition-colors">
                     <RefreshCw size={10} className={recsLoad?"animate-spin":""}/>Refresh
                   </button>
