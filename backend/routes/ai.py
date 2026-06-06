@@ -1,9 +1,9 @@
-"""AgriIntel AI routes — Gemini 2.0 Flash + Groq Llama."""
+"""AgriIntel AI routes — Groq Llama 70B + Mistral Small (context injection)."""
 import random
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from deps import current_user
-from services.ai_router import ai, ai_json
+from services.ai_router import ai, ai_json, ask_groq_vision, extract_json
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -28,6 +28,7 @@ class SentimentReq(BaseModel):
 class ChatReq(BaseModel):
     message: str
     history: list[dict] = []
+    live_data: dict = {}
 
 class ComplaintsReq(BaseModel):
     feedbacks: list[str]
@@ -124,10 +125,19 @@ Return ONLY valid JSON:
 
 # ─── Demand Alerts ──────────────────────────────────────────────────────────────
 
-@router.get("/demand-alerts")
-async def demand_alerts(user=Depends(current_user)):
-    prompt = f"""{CTX}
-Food festival next month. Wedding season peak in 2 weeks. Analyse likely demand spikes.
+class DemandAlertsReq(BaseModel):
+    live_data: dict = {}
+
+@router.post("/demand-alerts")
+async def demand_alerts(req: DemandAlertsReq = None, user=Depends(current_user)):
+    live_override = ""
+    if req and req.live_data:
+        prices = req.live_data.get("prices", {})
+        if prices:
+            price_str = ", ".join(f"{h} ₹{p}/kg" for h, p in prices.items())
+            live_override = f"\nCURRENT LIVE MARKET PRICES (use these exact values): {price_str}"
+    prompt = f"""{CTX}{live_override}
+Food festival next month. Wedding season peak in 2 weeks. Analyse likely demand spikes using the live prices above.
 Return ONLY valid JSON:
 {{"alerts":[{{"crop":"...","demand_change":"+X%","period":"...","urgency":"Critical/High/Medium","reason":"...","current_stock_kg":0,"required_kg":0,"action":"...","deadline":"..."}}],"total_revenue_opportunity":"₹X","summary":"one line"}}"""
     return await ai_json("demand", prompt, {
@@ -250,15 +260,129 @@ async def chat(req: ChatReq, user=Depends(current_user)):
             f"{'User' if m['role']=='user' else 'AI'}: {m['content']}"
             for m in req.history[-6:]
         )
+
+    live_override = ""
+    if req.live_data:
+        prices   = req.live_data.get("prices",   {})
+        changes  = req.live_data.get("changes",  {})
+        freshness= req.live_data.get("freshness",{})
+        waste    = req.live_data.get("waste",    {})
+        sensors  = req.live_data.get("sensors",  {})
+        kpis     = req.live_data.get("kpis",     {})
+        demand   = req.live_data.get("demand",   [])
+
+        parts = []
+        if prices:
+            parts.append("LIVE PRICES: " + ", ".join(f"{h} ₹{p}/kg" for h, p in prices.items()))
+        if changes:
+            parts.append("PRICE CHANGES: " + ", ".join(
+                f"{h} {'+' if float(str(v).replace('%','') or 0) >= 0 else ''}{v}%"
+                for h, v in changes.items()
+            ))
+        if freshness:
+            items = []
+            for h, d in freshness.items():
+                try: flag = " ⚠️URGENT" if float(d) < 2 else (" ⚡LOW" if float(d) < 3 else "")
+                except: flag = ""
+                items.append(f"{h} {d}d{flag}")
+            parts.append("LIVE FRESHNESS: " + ", ".join(items))
+        if waste:
+            excess = {h: w for h, w in waste.items() if float(str(w)) > 0}
+            if excess:
+                parts.append("EXCESS STOCK: " + ", ".join(f"{h} {w}kg excess" for h, w in excess.items()))
+        if sensors:
+            s = sensors
+            parts.append(
+                f"LIVE SENSORS: Temp {s.get('temperature','?')}°C, "
+                f"Humidity {s.get('humidity','?')}%, CO₂ {s.get('co2','?')}ppm, "
+                f"Light {s.get('light','?')}lux, pH {s.get('ph','?')}"
+            )
+        if kpis:
+            parts.append(
+                f"LIVE KPIs: Yield {kpis.get('yield','?')}kg, "
+                f"Water {kpis.get('water','?')}L, "
+                f"Power {kpis.get('power','?')}kWh, "
+                f"Delivery {kpis.get('delivery','?')}hrs"
+            )
+        if demand:
+            parts.append("DEMAND ALERTS: " + "; ".join(
+                f"{a.get('crop','?')} {a.get('demand_change','?')} ({a.get('urgency','?')})"
+                for a in demand[:5]
+            ))
+        if parts:
+            live_override = "\n\nLIVE DASHBOARD DATA (use these exact values — they override the static context above):\n" + "\n".join(f"• {p}" for p in parts)
+
     prompt = f"""You are AgriIntel — expert urban farm intelligence advisor. Deep knowledge in agronomy, supply chain, and chef partnerships.
 
-{CTX}
+{CTX}{live_override}
 {f"Recent conversation:{chr(10)}{history_text}{chr(10)}" if history_text else ""}
 User question: {req.message}
 
-Answer specifically and practically in 2-4 sentences. Use farm data when relevant. Be the smartest advisor in the room."""
+Answer specifically and practically in 2-4 sentences. Always use the LIVE DASHBOARD DATA values above (not the static context) when answering about prices, freshness, sensors, waste, or KPIs — those are the current real-time values from the dashboard. Be the smartest advisor in the room."""
     reply = await ai("chat", prompt)
     return {"reply": reply, "model": "groq-llama-70b"}
+
+
+# ─── AI Photo Inspection ────────────────────────────────────────────────────────
+
+class PhotoInspectReq(BaseModel):
+    image_base64: str
+    herb_name: str = ""
+    image_type: str = "image/jpeg"
+
+PHOTO_FALLBACK = {
+    "invalid_image": False,
+    "quality_score": 72, "grade": "Good", "confidence": 70,
+    "issues": [], "freshness_estimate": "3-4 days",
+    "color_analysis": "Green and fresh appearance", "wilt_detected": False,
+    "pest_damage": False, "recommendation": "Store at 4°C and use within 3 days.",
+    "refund_eligible": False, "refund_percentage": 0,
+}
+
+# Keywords in issues/color_analysis that signal a non-herb image
+_INVALID_SIGNALS = [
+    "not a herb", "not a plant", "not an herb", "no plant", "no herb",
+    "screenshot", "human", "person", "face", "food dish", "cooked",
+    "animal", "vehicle", "building", "text only", "logo", "unrelated",
+    "cannot identify", "unable to identify", "not identifiable",
+]
+
+@router.post("/photo-inspect")
+async def photo_inspect(req: PhotoInspectReq, user=Depends(current_user)):
+    raw = await ask_groq_vision(req.image_base64, req.herb_name, req.image_type)
+    result = extract_json(raw, PHOTO_FALLBACK)
+
+    # Ensure invalid_image key always present
+    result.setdefault("invalid_image", False)
+
+    # Secondary guard: if model forgot to set invalid_image, detect via text signals
+    if not result["invalid_image"]:
+        check_text = " ".join([
+            str(result.get("color_analysis", "")),
+            str(result.get("recommendation", "")),
+            " ".join(result.get("issues", [])),
+        ]).lower()
+        if any(sig in check_text for sig in _INVALID_SIGNALS):
+            result["invalid_image"] = True
+
+    # If flagged invalid, return early with zero scores
+    if result["invalid_image"]:
+        return {
+            "invalid_image": True,
+            "quality_score": 0, "grade": "Invalid", "confidence": 0,
+            "issues": ["Image does not appear to be a herb or plant"],
+            "freshness_estimate": "N/A", "color_analysis": "Not a herb image",
+            "wilt_detected": False, "pest_damage": False,
+            "recommendation": "Please upload a clear, close-up photo of the actual herb.",
+            "refund_eligible": False, "refund_percentage": 0,
+        }
+
+    # Auto-set refund eligibility thresholds for genuinely poor quality
+    grade = result.get("grade", "Good")
+    if grade in ("Poor", "Spoiled") and not result.get("refund_eligible"):
+        result["refund_eligible"] = True
+        result["refund_percentage"] = 50 if grade == "Poor" else 100
+    return result
 
 
 # ─── Sentiment Trend ────────────────────────────────────────────────────────────

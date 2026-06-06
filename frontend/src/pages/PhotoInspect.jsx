@@ -55,11 +55,6 @@ export default function PhotoInspect() {
           herb_name: herb,
           image_type: mimeType,
         });
-        if (data.invalid_image) {
-          toast.error("Not a herb photo — please upload a clear herb or plant image", { duration: 5000 });
-          setLoading(false);
-          return;
-        }
         setResult(data);
         if (data.refund_eligible) {
           toast.success(`${data.refund_percentage}% refund eligible — quality issue detected`, { duration: 5000 });
@@ -206,7 +201,32 @@ export default function PhotoInspect() {
             </motion.div>
           )}
 
-          {result && !loading && (
+          {result && !loading && result.invalid_image && (
+            <motion.div key="invalid" initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
+              className="bg-zinc-900 border border-red-500/30 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 min-h-[360px] text-center">
+              <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                <AlertTriangle size={28} className="text-red-400"/>
+              </div>
+              <div>
+                <p className="text-red-300 font-black text-base mb-2">Not a herb image</p>
+                <p className="text-zinc-400 text-sm leading-relaxed max-w-xs">
+                  The AI could not detect a herb or plant in this photo.<br/>
+                  Please upload a <span className="text-zinc-200 font-semibold">clear, well-lit photo of the actual herb</span> — no screenshots, food dishes, or unrelated images.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-2 w-full max-w-xs text-xs text-zinc-500 mt-1">
+                {["✓ Single herb / leaf", "✓ Good lighting", "✓ Close-up shot"].map(h => (
+                  <div key={h} className="bg-zinc-800 border border-zinc-700 rounded-xl p-2 text-center">{h}</div>
+                ))}
+              </div>
+              <button onClick={reset}
+                className="mt-2 px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 text-xs font-bold rounded-xl transition-all">
+                Try a Different Photo
+              </button>
+            </motion.div>
+          )}
+
+          {result && !loading && !result.invalid_image && (
             <motion.div key="result" initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
               className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
 
