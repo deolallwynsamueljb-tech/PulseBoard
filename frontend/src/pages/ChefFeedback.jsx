@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import {
   ChefHat, Star, Send, MessageSquare, Award, TrendingUp,
   Leaf, Clock, CheckCircle2, Building2, Mail,
-  ThumbsUp, Package, Truck, Video, Phone, Camera, ExternalLink
+  ThumbsUp, Package, Truck, Video, Phone, ExternalLink
 } from "lucide-react";
 
 const WA_FARM = "919994521399";
@@ -262,13 +262,6 @@ Sent via AgriIntel PulseBoard Chef Connect
                         color:"text-violet-400",
                         bg:"bg-violet-500/10 border-violet-500/20 hover:bg-violet-500/20",
                         action: () => window.open("https://meet.google.com/new", "_blank")
-                      },
-                      {
-                        label:"Photo Inspect",
-                        icon: Camera,
-                        color:"text-sky-400",
-                        bg:"bg-sky-500/10 border-sky-500/20 hover:bg-sky-500/20",
-                        action: () => window.location.href = "/photo-inspect"
                       },
                     ].map(({ label, icon: Icon, color, bg, action }) => (
                       <button key={label} type="button" onClick={action}

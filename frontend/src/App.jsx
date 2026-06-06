@@ -17,7 +17,6 @@ import FreshnessTracker from "./pages/FreshnessTracker";
 import StockMarket from "./pages/StockMarket";
 import WastePredictor from "./pages/WastePredictor";
 import SimpleView from "./pages/SimpleView";
-import PhotoInspect from "./pages/PhotoInspect";
 import API from "./api";
 
 /* ── Global top-right controls: language · theme · notifications ── */
@@ -599,7 +598,6 @@ function Layout() {
           <Route path="/market"    element={<StockMarket />}      />
           <Route path="/waste"     element={<WastePredictor />}   />
           <Route path="/simple"        element={<SimpleView />}     />
-          <Route path="/photo-inspect" element={<PhotoInspect />}  />
           <Route path="*"          element={<Navigate to="/" />}  />
         </Routes>
       </main>

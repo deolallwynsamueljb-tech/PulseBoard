@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLang } from "../context/LangContext";
 import {
   LayoutDashboard, BarChart3, MessageSquare, BrainCircuit,
-  Leaf, TrendingUp, Trash2, LogOut, ChevronRight, Sprout, Globe, ChefHat, Camera
+  Leaf, TrendingUp, Trash2, LogOut, ChevronRight, Sprout, Globe, ChefHat
 } from "lucide-react";
 
 const NAV = [
@@ -34,7 +34,6 @@ export default function Sidebar() {
     { path: "/freshness",    label: t.nav_freshness,   Icon: Leaf            },
     { path: "/market",       label: t.nav_market,      Icon: TrendingUp      },
     { path: "/waste",        label: t.nav_waste,       Icon: Trash2          },
-    { path: "/photo-inspect",label: "Photo Inspect",   Icon: Camera          },
     { section: t.sec_engage },
     { path: "/advisor",      label: t.nav_advisor,     Icon: BrainCircuit    },
     { path: "/pulse",        label: t.nav_pulse,       Icon: MessageSquare   },
