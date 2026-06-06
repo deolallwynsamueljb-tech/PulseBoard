@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from deps import current_user
 from services.ai_router import ai, ai_json, ask_groq_vision, extract_json
+from routes.ml import ml_calibrate_inspect
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -387,10 +388,9 @@ async def photo_inspect(req: PhotoInspectReq, user=Depends(current_user)):
     raw = await ask_groq_vision(req.image_base64, req.herb_name, req.image_type)
     result = extract_json(raw, PHOTO_FALLBACK)
 
-    # Ensure invalid_image key always present
     result.setdefault("invalid_image", False)
 
-    # Secondary guard: if model forgot to set invalid_image, detect via text signals
+    # Secondary guard: detect non-herb images via text signals
     if not result["invalid_image"]:
         check_text = " ".join([
             str(result.get("color_analysis", "")),
@@ -400,7 +400,6 @@ async def photo_inspect(req: PhotoInspectReq, user=Depends(current_user)):
         if any(sig in check_text for sig in _INVALID_SIGNALS):
             result["invalid_image"] = True
 
-    # If flagged invalid, return early with zero scores
     if result["invalid_image"]:
         return {
             "invalid_image": True,
@@ -412,7 +411,9 @@ async def photo_inspect(req: PhotoInspectReq, user=Depends(current_user)):
             "refund_eligible": False, "refund_percentage": 0,
         }
 
-    # Auto-set refund eligibility thresholds for genuinely poor quality
+    # ML calibration: Gradient Boosting classifier validates and overrides Groq grade
+    result = ml_calibrate_inspect(result)
+
     grade = result.get("grade", "Good")
     if grade in ("Poor", "Spoiled") and not result.get("refund_eligible"):
         result["refund_eligible"] = True
