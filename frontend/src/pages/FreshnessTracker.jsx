@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Leaf, AlertTriangle, CheckCircle2, RefreshCw, Package,
   Thermometer, Droplets, Filter, Clock, QrCode, X, Printer,
-  Volume2, VolumeX, Brain, BarChart2, GitBranch, Layers
+  Volume2, VolumeX
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -315,49 +315,6 @@ export default function FreshnessTracker() {
           </motion.div>
         ))}
       </div>
-
-      {/* ML Model Badge */}
-      <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.05 }}
-        className="bg-gradient-to-r from-violet-500/10 via-surface-800 to-emerald-500/10 border border-violet-500/25 rounded-2xl p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 rounded-xl bg-violet-500/20 flex items-center justify-center flex-shrink-0">
-            <Brain size={16} className="text-violet-400"/>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-black text-zinc-100">Trained ML Model · Random Forest Regressor</h2>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 font-bold">LIVE</span>
-            </div>
-            <p className="text-zinc-500 text-xs mt-0.5">Freshness predictions powered by scikit-learn · <span className="text-violet-400 font-medium">backend/ml/train_model.py</span></p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { icon:BarChart2, label:"Accuracy (R²)", value:"79.9%",     sub:"Variance explained",        color:"#a78bfa" },
-            { icon:Layers,    label:"Training Data", value:"4,000",     sub:"Simulated herb samples",    color:"#38bdf8" },
-            { icon:GitBranch, label:"Decision Trees", value:"200",     sub:"Max depth 12",               color:"#34d399" },
-            { icon:CheckCircle2, label:"Herbs Supported", value:"9",   sub:"Basil, Mint, Coriander…",   color:"#fbbf24" },
-          ].map(({ icon:Icon, label, value, sub, color }) => (
-            <div key={label} className="bg-surface-700/60 rounded-xl p-3 border border-surface-600/50">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <Icon size={11} style={{ color }}/>
-                <p className="text-zinc-500 text-[10px] uppercase tracking-wide">{label}</p>
-              </div>
-              <p className="font-black text-base tabular-nums" style={{ color }}>{value}</p>
-              <p className="text-zinc-600 text-[10px] mt-0.5">{sub}</p>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 bg-surface-700/40 rounded-xl px-4 py-2.5 flex items-center gap-3">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"/>
-          <p className="text-zinc-400 text-[11px]">
-            <span className="text-zinc-200 font-semibold">How it works: </span>
-            7 sensor inputs (temperature, humidity, CO₂, light, pH, days harvested, herb type) →
-            Random Forest predicts freshness score 0–100 → grade mapped to shelf-life days.
-            Model file: <span className="text-violet-400">freshness_model.pkl</span> (15 MB trained weights).
-          </p>
-        </div>
-      </motion.div>
 
       {/* Climate Simulator */}
       <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1 }}
