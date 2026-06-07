@@ -1,38 +1,45 @@
-from motor.motor_asyncio import AsyncIOMotorClient
-from urllib.parse import quote_plus
 from config import settings
 
 DB_NAME = settings.DB_NAME
+MONGODB_URL = settings.MONGODB_URL
 
-if settings.MONGO_USERNAME and settings.MONGO_PASSWORD:
-    MONGODB_URL = (
-        f"mongodb+srv://{quote_plus(settings.MONGO_USERNAME)}"
-        f":{quote_plus(settings.MONGO_PASSWORD)}"
-        f"@{settings.MONGO_HOST}/?retryWrites=true&w=majority&authSource=admin&appName=Cluster0"
-    )
-else:
-    MONGODB_URL = settings.MONGODB_URL
+# Client and db are created lazily inside check_connection() to avoid
+# blocking the Python process at import time (mongodb+srv DNS resolution
+# is synchronous in pymongo and can take 5-10 seconds on cold starts).
+_client = None
+_db = None
 
-try:
-    client = AsyncIOMotorClient(MONGODB_URL, serverSelectionTimeoutMS=8000) if MONGODB_URL else None
-    db     = client[DB_NAME] if client else None
-except Exception as e:
-    print(f"MongoDB client init error: {e}")
-    client = None
-    db     = None
+# Expose module-level names so `from database import client` keeps working
+client = None
+db = None
+
 
 async def check_connection():
-    if db is None:
-        print("❌ No MongoDB credentials configured")
+    global _client, _db, client, db
+    if not MONGODB_URL:
+        print("❌ No MONGODB_URL configured")
         return False
-    print(f"🔌 Connecting as user: {settings.MONGO_USERNAME!r} host: {settings.MONGO_HOST!r}")
+    # Create client lazily on first call
+    if _client is None:
+        try:
+            from motor.motor_asyncio import AsyncIOMotorClient
+            host_hint = MONGODB_URL.split("@")[-1].split("/")[0][:40]
+            print(f"🔌 Connecting to: {host_hint!r}")
+            _client = AsyncIOMotorClient(MONGODB_URL, serverSelectionTimeoutMS=6000)
+            _db = _client[DB_NAME]
+            client = _client
+            db = _db
+        except Exception as e:
+            print(f"❌ MongoDB client init error: {e}")
+            return False
     try:
-        await db.command("ping")
+        await _db.command("ping")
         print("✅ MongoDB connected!")
         return True
     except Exception as e:
         print(f"❌ Connection failed: {e}")
         return False
 
+
 def get_db():
-    return db
+    return _db

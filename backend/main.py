@@ -3,21 +3,21 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from routes import auth, kpis, analytics, feedback, ai, sensors, freshness, market, waste, ml
-from database import check_connection, client
+from database import check_connection
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await check_connection()
+    asyncio.create_task(check_connection())  # non-blocking: creates Motor client + pings in background
     yield
-    if client is not None:
-        client.close()
+    import database
+    if database._client is not None:
+        database._client.close()
 
 app = FastAPI(title="AgriIntel API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -30,11 +30,11 @@ for router in [auth.router, kpis.router, analytics.router, feedback.router,
 @app.get("/health")
 async def health():
     from config import settings
-    from database import db
+    import database
     mongo_ok = False
-    if db is not None:
+    if database._db is not None:
         try:
-            await asyncio.wait_for(db.command("ping"), timeout=10.0)
+            await database._db.command("ping")
             mongo_ok = True
         except Exception:
             pass
