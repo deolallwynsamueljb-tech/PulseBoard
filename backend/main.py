@@ -31,13 +31,7 @@ for router in [auth.router, kpis.router, analytics.router, feedback.router,
 async def health():
     from config import settings
     import database
-    mongo_ok = False
-    if database._db is not None:
-        try:
-            await database._db.command("ping")
-            mongo_ok = True
-        except Exception:
-            pass
+    mongo_ok = await database.check_connection()
     return {
         "status": "ok",
         "service": "AgriIntel API v2.0.0",

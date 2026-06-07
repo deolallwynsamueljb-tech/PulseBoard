@@ -131,6 +131,7 @@ export default function AIAdvisor() {
   const [contextTab,  setContextTab]  = useState("prices");
   const [backendStatus, setBackendStatus] = useState("checking"); // "checking" | "online" | "offline"
   const [aiKeys,        setAiKeys]        = useState({ groq: false, mistral: false, gemini: false });
+  const [mongoStatus,   setMongoStatus]   = useState("checking"); // "connected" | "disconnected" | "checking"
   const endRef   = useRef(null);
   const inputRef = useRef(null);
 
@@ -140,11 +141,14 @@ export default function AIAdvisor() {
       if (data.status && data.status !== "offline") {
         setBackendStatus("online");
         setAiKeys(data.ai || { groq: false, mistral: false, gemini: false });
+        setMongoStatus(data.mongodb === "connected" ? "connected" : "disconnected");
       } else {
         setBackendStatus("offline");
+        setMongoStatus("disconnected");
       }
     } catch {
       setBackendStatus("offline");
+      setMongoStatus("disconnected");
     }
   }, []);
 
@@ -271,6 +275,15 @@ export default function AIAdvisor() {
             {backendStatus === "online"  ? `API ${[aiKeys.gemini?"Gemini":null, aiKeys.mistral?"Mistral":null, aiKeys.groq?"Groq":null].filter(Boolean).join(" + ") || "no keys"}` :
              backendStatus === "offline" ? "Backend offline" : "Checking…"}
           </button>
+          {/* MongoDB cluster badge */}
+          {backendStatus !== "checking" && (
+            <span className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg border ${
+              mongoStatus === "connected" ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400" : "bg-red-500/10 border-red-500/25 text-red-400"
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${mongoStatus === "connected" ? "bg-emerald-400" : "bg-red-400 animate-pulse"}`}/>
+              {mongoStatus === "connected" ? "Cluster connected" : "Cluster offline"}
+            </span>
+          )}
           <button onClick={clearChat}
             className="text-xs text-zinc-500 hover:text-zinc-300 border border-surface-600 hover:border-surface-500 bg-surface-800 px-3 py-1.5 rounded-xl transition-all">
             {t.lbl_clear_chat}
