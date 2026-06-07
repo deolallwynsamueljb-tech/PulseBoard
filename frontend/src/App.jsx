@@ -383,7 +383,7 @@ const VOICE_LOCALE = { en:"en-IN", ta:"ta-IN", hi:"hi-IN", te:"te-IN", kn:"kn-IN
 
 function FarmerVoiceFab() {
   const { user } = useAuth();
-  const { lang } = useLang();
+  const { lang, t } = useLang();
   const [listening,  setListening]  = useState(false);
   const [transcript, setTranscript] = useState("");
   const [open,       setOpen]       = useState(false);
@@ -479,7 +479,7 @@ function FarmerVoiceFab() {
             animate={{ opacity:1, scale:1, y:0 }}
             exit={{ opacity:0, scale:0.92, y:12 }}
             transition={{ type:"spring", stiffness:400, damping:28 }}
-            className="fixed bottom-36 md:bottom-24 left-4 md:left-6 z-50 w-[calc(100vw-2rem)] max-w-[288px] bg-zinc-900/97 backdrop-blur-xl border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
+            className="fixed bottom-36 md:bottom-24 right-4 md:right-6 z-50 w-[calc(100vw-2rem)] max-w-[288px] bg-zinc-900/97 backdrop-blur-xl border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
           >
             <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-zinc-800">
               <div className="flex items-center gap-2">
@@ -487,8 +487,8 @@ function FarmerVoiceFab() {
                   <Mic size={14} className={aiLoading ? "text-amber-400" : "text-emerald-400"}/>
                 </div>
                 <div>
-                  <p className="text-zinc-100 text-xs font-black leading-none">Voice Harvest Log</p>
-                  <p className="text-zinc-600 text-[9px]">{aiLoading ? "AI processing…" : "Groq AI · speaks back in your language"}</p>
+                  <p className="text-zinc-100 text-xs font-black leading-none">{t.mic_title}</p>
+                  <p className="text-zinc-600 text-[9px]">{aiLoading ? t.mic_processing : t.mic_subtitle}</p>
                 </div>
               </div>
               <button onClick={() => { stopVoice(); window.speechSynthesis.cancel(); setOpen(false); }}>
@@ -501,7 +501,7 @@ function FarmerVoiceFab() {
               <div className={`min-h-[52px] bg-zinc-800 border rounded-xl px-3 py-2.5 transition-all ${listening ? "border-emerald-500/50 shadow-sm shadow-emerald-500/10" : "border-zinc-700"}`}>
                 {transcript
                   ? <p className="text-zinc-200 text-xs leading-relaxed">{transcript}</p>
-                  : <p className="text-zinc-600 text-xs italic">{listening ? "Listening…" : 'Say: "30kg Basil, Zone A, excellent quality"'}</p>
+                  : <p className="text-zinc-600 text-xs italic">{listening ? t.mic_listening : t.mic_hint}</p>
                 }
                 {listening && (
                   <div className="flex gap-0.5 mt-1.5">
@@ -520,7 +520,7 @@ function FarmerVoiceFab() {
                       <span key={d} className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay:`${d}ms` }}/>
                     ))}
                   </div>
-                  <span className="text-zinc-500 text-[10px]">Groq AI analysing harvest…</span>
+                  <span className="text-zinc-500 text-[10px]">{t.mic_analysing}</span>
                 </div>
               )}
 
@@ -528,7 +528,7 @@ function FarmerVoiceFab() {
               {aiReply && !aiLoading && (
                 <motion.div initial={{ opacity:0, y:4 }} animate={{ opacity:1, y:0 }}
                   className="bg-emerald-500/8 border border-emerald-500/20 rounded-xl px-3 py-2.5">
-                  <p className="text-emerald-500 text-[9px] font-black uppercase tracking-wider mb-1">AI RESPONSE · spoken aloud</p>
+                  <p className="text-emerald-500 text-[9px] font-black uppercase tracking-wider mb-1">{t.mic_ai_label}</p>
                   <p className="text-emerald-200 text-xs leading-relaxed">{aiReply}</p>
                 </motion.div>
               )}
@@ -547,11 +547,11 @@ function FarmerVoiceFab() {
                   className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold rounded-xl transition-all ${
                     listening ? "bg-red-500/10 border border-red-500/30 text-red-400" : "bg-emerald-600/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/20"
                   }`}>
-                  {listening ? <><MicOff size={12}/> Stop</> : <><Mic size={12}/> {aiReply ? "Speak Again" : "Speak"}</>}
+                  {listening ? <><MicOff size={12}/> {t.mic_stop}</> : <><Mic size={12}/> {aiReply ? t.mic_speak_again : t.mic_speak}</>}
                 </button>
                 <button onClick={logHarvest} disabled={!transcript && !parsed}
                   className="flex-1 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 text-white transition-all">
-                  Log Harvest
+                  {t.mic_log}
                 </button>
               </div>
             </div>
@@ -563,7 +563,7 @@ function FarmerVoiceFab() {
       <motion.button
         onClick={() => open ? (window.speechSynthesis.cancel(), setOpen(false)) : startVoice()}
         whileHover={{ scale:1.08 }} whileTap={{ scale:0.94 }}
-        className={`fixed bottom-20 md:bottom-6 left-4 md:left-6 z-50 w-12 h-12 md:w-14 md:h-14 rounded-full backdrop-blur-sm border shadow-2xl flex items-center justify-center transition-colors ${
+        className={`fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 w-12 h-12 md:w-14 md:h-14 rounded-full backdrop-blur-sm border shadow-2xl flex items-center justify-center transition-colors ${
           listening ? "bg-red-500/85 border-red-400/30 shadow-red-500/30 animate-pulse"
           : open     ? "bg-zinc-800/95 border-zinc-600"
                      : "bg-emerald-600/85 hover:bg-emerald-500/95 border-emerald-400/30 shadow-emerald-500/30"

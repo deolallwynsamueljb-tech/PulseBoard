@@ -237,7 +237,7 @@ function ChefOrderForm({ freshness, t }) {
         <span className="text-2xl">📦</span>
         <div>
           <h3 className="text-lg font-black text-white">{t.lbl_place_order}</h3>
-          <p className="text-xs text-zinc-500">Sends directly to the farmer's WhatsApp</p>
+          <p className="text-xs text-zinc-500">{t.chef_sends_direct}</p>
         </div>
       </div>
 
@@ -245,13 +245,13 @@ function ChefOrderForm({ freshness, t }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         <input
           className="bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-all"
-          placeholder="Your name (required)"
+          placeholder={t.chef_name_ph}
           value={chefName}
           onChange={e => setChefName(e.target.value)}
         />
         <input
           className="bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-all"
-          placeholder="Restaurant (optional)"
+          placeholder={t.chef_restaurant_ph}
           value={restaurant}
           onChange={e => setRestaurant(e.target.value)}
         />
@@ -308,7 +308,7 @@ function ChefOrderForm({ freshness, t }) {
       </div>
 
       <p className="text-zinc-600 text-[11px] text-center mt-3">
-        Order goes directly to the farmer · delivery avg 2.4 hrs
+        {t.chef_order_footer}
       </p>
     </div>
   );
@@ -322,7 +322,7 @@ export default function SimpleView() {
   const [sensors, setSensors] = useState(FALLBACK.sensors);
 
   useEffect(() => {
-    const BASE = import.meta.env.VITE_API_URL || "http://localhost:8001";
+    const BASE = import.meta.env.VITE_API_URL || "";
     fetch(`${BASE}/sensors/live`).then(r=>r.json())
       .then(d => { if (d?.temperature) setSensors(d); }).catch(()=>{});
   }, []);
@@ -453,7 +453,7 @@ export default function SimpleView() {
               </div>
               <div className="text-right">
                 <p className="text-2xl font-black text-emerald-400">{freshness.length}</p>
-                <p className="text-xs text-zinc-500">herbs live</p>
+                <p className="text-xs text-zinc-500">{t.chef_herbs_live}</p>
               </div>
             </div>
 
@@ -465,7 +465,7 @@ export default function SimpleView() {
                   <p className="text-red-300 font-black text-sm">
                     {urgent.map(h => t.herbs?.[h.herb] || h.herb).join(", ")} — {t.pickNow}
                   </p>
-                  <p className="text-red-400 text-xs">Special discount available. WhatsApp to order.</p>
+                  <p className="text-red-400 text-xs">{t.chef_discount}</p>
                 </div>
               </div>
             )}

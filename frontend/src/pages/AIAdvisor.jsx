@@ -136,12 +136,16 @@ export default function AIAdvisor() {
 
   const checkHealth = useCallback(async () => {
     try {
-      const { data } = await API.get("/health", { timeout: 15000 });
-      if (data.status !== "offline") {
+      const { data } = await API.get("/health", { timeout: 20000 });
+      if (data.status && data.status !== "offline") {
         setBackendStatus("online");
-        setAiKeys(data.ai || { groq: false, mistral: false });
+        setAiKeys(data.ai || { groq: false, mistral: false, gemini: false });
+      } else {
+        setBackendStatus("offline");
       }
-    } catch {}
+    } catch {
+      setBackendStatus("offline");
+    }
   }, []);
 
   /* Load live context data — if data arrives, backend is definitely online */
@@ -187,14 +191,23 @@ export default function AIAdvisor() {
 
   useEffect(() => { checkHealth(); loadLiveData(); }, [checkHealth, loadLiveData]);
 
+  /* Auto-retry health check when offline */
+  useEffect(() => {
+    if (backendStatus !== "offline") return;
+    const t = setTimeout(() => { checkHealth(); loadLiveData(); }, 8000);
+    return () => clearTimeout(t);
+  }, [backendStatus, checkHealth, loadLiveData]);
+
   /* Load AI panel content when tab is first selected */
   useEffect(() => { loadAITab(activeTab); }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, loading]);
 
-  const ask = async (q = input.trim()) => {
+  const ask = async (q = input.trim(), isRetry = false) => {
     if (!q || loading) return;
-    setMessages(p => [...p, { role:"user", text:q }]);
-    setInput("");
+    if (!isRetry) {
+      setMessages(p => [...p, { role:"user", text:q }]);
+      setInput("");
+    }
     setLoading(true);
     try {
       const live_data = buildLiveData(liveMarket, liveFresh, liveWaste, liveSensors, liveKpis, demand);
@@ -204,11 +217,11 @@ export default function AIAdvisor() {
         live_data,
       }, { timeout: 55000 });
       const data = res.data;
-      // Auto-retry once if server is still warming up
-      if (res._fallback || data.model === "offline") {
+      // Retry once if server is warming up
+      if (!isRetry && (res._fallback || data.model === "offline")) {
         setMessages(p => [...p, { role:"ai", text:"⏳ AI warming up — retrying in 5 seconds automatically..." }]);
         setLoading(false);
-        setTimeout(() => ask(q), 5000);
+        setTimeout(() => ask(q, true), 5000);
         return;
       }
       const reply = data.reply && data.reply.trim() && data.reply.trim() !== "{}"
